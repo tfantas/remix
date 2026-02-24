@@ -354,9 +354,9 @@ export function createRouter(options?: RouterOptions): Router {
     options<pattern extends string>(
       route: pattern | RoutePattern<pattern> | Route<'OPTIONS' | 'ANY', pattern>,
       action: Action<'OPTIONS', pattern>,
-      ): void {
-        addRoute('OPTIONS', route, action)
-      },
+    ): void {
+      addRoute('OPTIONS', route, action)
+    },
   }
 
   return router
