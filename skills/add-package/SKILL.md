@@ -147,13 +147,12 @@ npm i remix <peer-dependency>
 - License section format:
   - `See [LICENSE](https://github.com/remix-run/remix/blob/main/LICENSE)`
 
-8. Wire package into umbrella `remix` exports when required.
+8. Do not manually update the generated `remix` package in PRs.
 
-- Add re-export entry file in `packages/remix/src/` (e.g. `my-package.ts`).
-- Add subpath export in `packages/remix/package.json`.
-- Add dependency in `packages/remix/package.json`:
-  - `"@remix-run/<package-name>": "workspace:^"`
-- If user asks for full surfacing, also update root `README.md` package list.
+- `packages/remix` is generated automatically in CI.
+- Do not manually edit `packages/remix/package.json` or `packages/remix/src/*` in new pull requests.
+- Do not add `packages/remix/.changes/*` change files in new pull requests.
+- If user asks for full surfacing, you can still update root `README.md` package list when applicable.
 
 9. Validate before finishing.
 
@@ -164,6 +163,7 @@ npm i remix <peer-dependency>
 - Run repo lint (required):
   - `pnpm run lint`
 - Add or update a change file under `packages/<package-name>/.changes/` when requested by contribution workflow.
+- Exception: do not add a change file under `packages/remix/.changes/`; `remix` package updates are CI-generated.
 
 ## Templates
 
