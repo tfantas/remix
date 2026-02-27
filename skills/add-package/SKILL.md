@@ -19,9 +19,12 @@ Follow this exactly when creating package files, public exports, tests, and docs
   - `package.json`
   - `tsconfig.json`
   - `tsconfig.build.json`
+  - `CHANGELOG.md`
   - `README.md`
   - `LICENSE`
+  - `.changes/README.md`
   - `src/`
+- For new packages, start `CHANGELOG.md` with `## Unreleased` as the first section to indicate changes are not released yet.
 
 2. Set up `package.json` using monorepo conventions.
 
@@ -163,6 +166,7 @@ npm i remix <peer-dependency>
 - Run repo lint (required):
   - `pnpm run lint`
 - Add or update a change file under `packages/<package-name>/.changes/` when requested by contribution workflow.
+- For a brand-new package, the initial change file should use a `minor.` filename (for example, `minor.initial-release.md`).
 - Exception: do not add a change file under `packages/remix/.changes/`; `remix` package updates are CI-generated.
 
 ## Templates
