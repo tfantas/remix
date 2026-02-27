@@ -23,12 +23,9 @@ describe('mysql adapter integration', () => {
     }
 
     pool = createPool(process.env.DATA_TABLE_MYSQL_URL as string)
-    await setupAdapterIntegrationSchema(
-      async (statement) => {
-        await pool.query(statement)
-      },
-      'mysql',
-    )
+    await setupAdapterIntegrationSchema(async (statement) => {
+      await pool.query(statement)
+    }, 'mysql')
   })
 
   after(async () => {
@@ -36,12 +33,9 @@ describe('mysql adapter integration', () => {
       return
     }
 
-    await teardownAdapterIntegrationSchema(
-      async (statement) => {
-        await pool.query(statement)
-      },
-      'mysql',
-    )
+    await teardownAdapterIntegrationSchema(async (statement) => {
+      await pool.query(statement)
+    }, 'mysql')
     await pool.end()
   })
 
@@ -49,12 +43,9 @@ describe('mysql adapter integration', () => {
     integrationEnabled,
     createDatabase: () => createDatabase(createMysqlDatabaseAdapter(pool)),
     resetDatabase: async () => {
-      await resetAdapterIntegrationSchema(
-        async (statement) => {
-          await pool.query(statement)
-        },
-        'mysql',
-      )
+      await resetAdapterIntegrationSchema(async (statement) => {
+        await pool.query(statement)
+      }, 'mysql')
     },
   })
 })

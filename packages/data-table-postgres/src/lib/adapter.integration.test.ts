@@ -24,12 +24,9 @@ describe('postgres adapter integration', () => {
     }
 
     pool = new Pool({ connectionString: process.env.DATA_TABLE_POSTGRES_URL })
-    await setupAdapterIntegrationSchema(
-      async (statement) => {
-        await pool.query(statement)
-      },
-      'postgres',
-    )
+    await setupAdapterIntegrationSchema(async (statement) => {
+      await pool.query(statement)
+    }, 'postgres')
   })
 
   after(async () => {
@@ -37,12 +34,9 @@ describe('postgres adapter integration', () => {
       return
     }
 
-    await teardownAdapterIntegrationSchema(
-      async (statement) => {
-        await pool.query(statement)
-      },
-      'postgres',
-    )
+    await teardownAdapterIntegrationSchema(async (statement) => {
+      await pool.query(statement)
+    }, 'postgres')
     await pool.end()
   })
 
@@ -50,12 +44,9 @@ describe('postgres adapter integration', () => {
     integrationEnabled,
     createDatabase: () => createDatabase(createPostgresDatabaseAdapter(pool)),
     resetDatabase: async () => {
-      await resetAdapterIntegrationSchema(
-        async (statement) => {
-          await pool.query(statement)
-        },
-        'postgres',
-      )
+      await resetAdapterIntegrationSchema(async (statement) => {
+        await pool.query(statement)
+      }, 'postgres')
     },
   })
 })

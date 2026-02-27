@@ -503,10 +503,9 @@ describe('postgres adapter', () => {
     }
 
     let db = createDatabase(createPostgresDatabaseAdapter(client as never))
-    let result = await db.query(accounts).insert(
-      { id: 1, email: 'a@example.com' },
-      { returning: '*' },
-    )
+    let result = await db
+      .query(accounts)
+      .insert({ id: 1, email: 'a@example.com' }, { returning: '*' })
 
     assert.equal(result.affectedRows, 1)
     assert.equal(result.insertId, 1)

@@ -22,12 +22,9 @@ describe('sqlite adapter integration', () => {
     }
 
     sqlite = new BetterSqlite3(':memory:')
-    await setupAdapterIntegrationSchema(
-      async (statement) => {
-        sqlite.exec(statement)
-      },
-      'sqlite',
-    )
+    await setupAdapterIntegrationSchema(async (statement) => {
+      sqlite.exec(statement)
+    }, 'sqlite')
   })
 
   after(async () => {
@@ -35,12 +32,9 @@ describe('sqlite adapter integration', () => {
       return
     }
 
-    await teardownAdapterIntegrationSchema(
-      async (statement) => {
-        sqlite.exec(statement)
-      },
-      'sqlite',
-    )
+    await teardownAdapterIntegrationSchema(async (statement) => {
+      sqlite.exec(statement)
+    }, 'sqlite')
     sqlite.close()
   })
 
@@ -48,12 +42,9 @@ describe('sqlite adapter integration', () => {
     integrationEnabled,
     createDatabase: () => createDatabase(createSqliteDatabaseAdapter(sqlite)),
     resetDatabase: async () => {
-      await resetAdapterIntegrationSchema(
-        async (statement) => {
-          sqlite.exec(statement)
-        },
-        'sqlite',
-      )
+      await resetAdapterIntegrationSchema(async (statement) => {
+        sqlite.exec(statement)
+      }, 'sqlite')
     },
   })
 })
