@@ -156,7 +156,9 @@ async function connectToMemcache(address: MemcacheAddress): Promise<net.Socket> 
 
     function onError(error: Error): void {
       finalize(
-        new Error(`Failed to connect to Memcache ${address.host}:${address.port}: ${error.message}`),
+        new Error(
+          `Failed to connect to Memcache ${address.host}:${address.port}: ${error.message}`,
+        ),
       )
     }
 
@@ -226,7 +228,10 @@ async function readFromSocket(
     }
 
     function onEnd(): void {
-      finalize(undefined, new Error('Memcache server closed the connection before response completed'))
+      finalize(
+        undefined,
+        new Error('Memcache server closed the connection before response completed'),
+      )
     }
 
     function onTimeout(): void {
@@ -281,7 +286,8 @@ function isGetResponseComplete(response: Buffer): boolean {
     return true
   }
 
-  let expectedLength = lineEnd + CRLF_BUFFER.length + bytes + CRLF_BUFFER.length + END_RESPONSE.length
+  let expectedLength =
+    lineEnd + CRLF_BUFFER.length + bytes + CRLF_BUFFER.length + END_RESPONSE.length
   return response.length >= expectedLength
 }
 

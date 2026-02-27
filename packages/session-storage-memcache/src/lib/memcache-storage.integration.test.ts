@@ -38,49 +38,61 @@ describe('memcache session storage integration', () => {
     assert.equal(response3.session.get('count'), 3)
   })
 
-  it('clears session data when the session is destroyed', { skip: !integrationEnabled }, async () => {
-    let storage = createIntegrationStorage()
-    let requests = createRequestHelpers(storage)
+  it(
+    'clears session data when the session is destroyed',
+    { skip: !integrationEnabled },
+    async () => {
+      let storage = createIntegrationStorage()
+      let requests = createRequestHelpers(storage)
 
-    let response1 = await requests.requestIndex()
-    assert.equal(response1.session.get('count'), 1)
+      let response1 = await requests.requestIndex()
+      assert.equal(response1.session.get('count'), 1)
 
-    let response2 = await requests.requestIndex(response1.cookie)
-    assert.equal(response2.session.get('count'), 2)
+      let response2 = await requests.requestIndex(response1.cookie)
+      assert.equal(response2.session.get('count'), 2)
 
-    let response3 = await requests.requestDestroy(response2.cookie)
-    assert.ok(response3.session.destroyed)
+      let response3 = await requests.requestDestroy(response2.cookie)
+      assert.ok(response3.session.destroyed)
 
-    let response4 = await requests.requestIndex(response3.cookie)
-    assert.equal(response4.session.get('count'), 1)
-    assert.notEqual(response4.session.id, response3.session.id)
-  })
+      let response4 = await requests.requestIndex(response3.cookie)
+      assert.equal(response4.session.get('count'), 1)
+      assert.notEqual(response4.session.id, response3.session.id)
+    },
+  )
 
-  it('does not set a cookie when session data is not changed', { skip: !integrationEnabled }, async () => {
-    let storage = createIntegrationStorage()
-    let requests = createRequestHelpers(storage)
+  it(
+    'does not set a cookie when session data is not changed',
+    { skip: !integrationEnabled },
+    async () => {
+      let storage = createIntegrationStorage()
+      let requests = createRequestHelpers(storage)
 
-    let response = await requests.requestSession()
-    assert.equal(response.session.dirty, false)
-    assert.equal(response.cookie, null)
-  })
+      let response = await requests.requestSession()
+      assert.equal(response.session.dirty, false)
+      assert.equal(response.cookie, null)
+    },
+  )
 
-  it('makes flash data available only on the next request', { skip: !integrationEnabled }, async () => {
-    let storage = createIntegrationStorage()
-    let requests = createRequestHelpers(storage)
+  it(
+    'makes flash data available only on the next request',
+    { skip: !integrationEnabled },
+    async () => {
+      let storage = createIntegrationStorage()
+      let requests = createRequestHelpers(storage)
 
-    let response1 = await requests.requestSession()
-    assert.equal(response1.session.get('message'), undefined)
+      let response1 = await requests.requestSession()
+      assert.equal(response1.session.get('message'), undefined)
 
-    let response2 = await requests.requestFlash(response1.cookie)
-    assert.equal(response2.session.get('message'), undefined)
+      let response2 = await requests.requestFlash(response1.cookie)
+      assert.equal(response2.session.get('message'), undefined)
 
-    let response3 = await requests.requestSession(response2.cookie)
-    assert.equal(response3.session.get('message'), 'success!')
+      let response3 = await requests.requestSession(response2.cookie)
+      assert.equal(response3.session.get('message'), 'success!')
 
-    let response4 = await requests.requestSession(response3.cookie)
-    assert.equal(response4.session.get('message'), undefined)
-  })
+      let response4 = await requests.requestSession(response3.cookie)
+      assert.equal(response4.session.get('message'), undefined)
+    },
+  )
 
   it(
     'leaves old session data in storage by default when the id is regenerated',

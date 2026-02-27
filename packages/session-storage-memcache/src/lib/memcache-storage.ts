@@ -118,7 +118,9 @@ function assertValidKeyPrefix(keyPrefix: string): void {
 
   let keyPrefixBytes = Buffer.byteLength(keyPrefix, 'utf8')
   if (keyPrefixBytes + HASH_LENGTH > MAX_MEMCACHE_KEY_LENGTH) {
-    throw new Error(`Memcache keyPrefix is too long. Maximum length is ${MAX_MEMCACHE_KEY_LENGTH - HASH_LENGTH} bytes`)
+    throw new Error(
+      `Memcache keyPrefix is too long. Maximum length is ${MAX_MEMCACHE_KEY_LENGTH - HASH_LENGTH} bytes`,
+    )
   }
 }
 

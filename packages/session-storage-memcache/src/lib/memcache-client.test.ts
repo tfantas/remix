@@ -58,10 +58,7 @@ describe('memcache client', () => {
   })
 
   it('throws for invalid server addresses', () => {
-    assert.throws(
-      () => createMemcacheClient('127.0.0.1/path'),
-      /Expected format "host:port"/,
-    )
+    assert.throws(() => createMemcacheClient('127.0.0.1/path'), /Expected format "host:port"/)
   })
 
   it('throws when memcache returns an invalid get response', async () => {
@@ -92,7 +89,10 @@ describe('memcache client', () => {
 
     let client = createMemcacheClient(server.address)
 
-    await assert.rejects(() => client.set('test-key', 'hello', 0), /Memcache set failed: NOT_STORED/)
+    await assert.rejects(
+      () => client.set('test-key', 'hello', 0),
+      /Memcache set failed: NOT_STORED/,
+    )
   })
 
   it('throws when delete fails', async () => {
