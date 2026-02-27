@@ -141,35 +141,6 @@ export async function updatePr(prNumber: number, options: { title?: string; body
 }
 
 /**
- * Set package labels on a PR (pkg:*), replacing any existing package labels
- */
-export async function setPrPkgLabels(prNumber: number, packageNames: string[]) {
-  // Get current labels
-  let response = await request('GET /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-    ...auth(),
-    owner,
-    repo,
-    issue_number: prNumber,
-  })
-
-  let currentLabels = response.data.map((label) => label.name)
-
-  // Remove existing pkg: labels, add new ones
-  let labelsToKeep = currentLabels.filter((label) => !label.startsWith('pkg:'))
-  let pkgLabels = packageNames.map((name) => `pkg:${name}`)
-  let newLabels = [...labelsToKeep, ...pkgLabels]
-
-  // Set labels
-  await request('PUT /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-    ...auth(),
-    owner,
-    repo,
-    issue_number: prNumber,
-    labels: newLabels,
-  })
-}
-
-/**
  * Close a PR with an optional comment
  */
 export async function closePr(prNumber: number, comment?: string) {
