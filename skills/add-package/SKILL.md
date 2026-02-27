@@ -128,11 +128,21 @@ Use this `tsconfig.build.json` pattern:
   - Optional deep-dive sections (only if needed)
   - `## Related Packages` (if applicable)
   - `## License`
-- Installation is usually:
+- Installation instructions must always include installing the `remix` package.
+- If using the package requires a peer dependency, installation instructions must also include that peer dependency in the command.
+- Preferred installation pattern:
 
 ```sh
 npm i remix
 ```
+
+- Example when a peer dependency is required:
+
+```sh
+npm i remix <peer-dependency>
+```
+
+- Usage examples must always import from `remix` package exports, not from `@remix-run/<package-name>` directly.
 
 - License section format:
   - `See [LICENSE](https://github.com/remix-run/remix/blob/main/LICENSE)`
