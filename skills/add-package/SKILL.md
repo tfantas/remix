@@ -30,6 +30,7 @@ Follow this exactly when creating package files, public exports, tests, and docs
 
 - Use:
   - `name`: `@remix-run/<package-name>`
+  - `version` (for brand-new packages): `"0.0.0"`
   - `type`: `"module"`
   - `license`: `"MIT"`
   - `repository.directory`: `packages/<package-name>`
@@ -166,7 +167,7 @@ npm i remix <peer-dependency>
 - Run repo lint (required):
   - `pnpm run lint`
 - Add or update a change file under `packages/<package-name>/.changes/` when requested by contribution workflow.
-- For a brand-new package, the initial change file should use a `minor.` filename (for example, `minor.initial-release.md`).
+- For a brand-new package, the initial change file should use a `minor.` filename (for example, `minor.initial-release.md`) so the first release bumps `0.0.0` to `0.1.0`.
 - Exception: do not add a change file under `packages/remix/.changes/`; `remix` package updates are CI-generated.
 
 ## Templates

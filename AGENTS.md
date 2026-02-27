@@ -50,6 +50,7 @@
 - **Remix package changes are generated in CI**: In new PRs, do not manually edit `packages/remix/*` and do not add `packages/remix/.changes/*` files.
 - **Updating changes**: If iterating on an unpublished change with a change file, update it in place rather than creating a new one.
 - **Versioning**: Follow semver, but ensure you follow 0.x conventions where breaking changes can happen in minor releases:
+  - For **brand-new packages**: Start at version `0.0.0`. The first release should use a `minor` change file so it bumps to `0.1.0`.
   - For **v0.x packages**: Use "minor" for breaking changes and new features, "patch" for bug fixes. Never use "major" unless explicitly instructed. Change files for breaking changes in v0.x packages should start with `BREAKING CHANGE: ` so they are hoisted to the top.
   - For **v1.x+ packages**: Use standard semver - "major" for breaking changes, "minor" for new features, "patch" for bug fixes.
   - **Breaking changes are relative to main**: If you introduce a new API in a PR and then change it within the same PR before merging, that's not considered a breaking change.
