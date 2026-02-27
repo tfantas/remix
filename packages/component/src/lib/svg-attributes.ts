@@ -113,9 +113,7 @@ export function normalizeSvgAttributeName(name: string): string {
   return camelToKebab(name)
 }
 
-export function normalizeSvgAttribute(
-  name: string,
-): {
+export function normalizeSvgAttribute(name: string): {
   ns?: string
   attr: string
 } {
