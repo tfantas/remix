@@ -27,7 +27,10 @@ let storage = createS3FileStorage({
   region: 'us-east-1',
 })
 
-await storage.set('uploads/hello.txt', new File(['hello world'], 'hello.txt', { type: 'text/plain' }))
+await storage.set(
+  'uploads/hello.txt',
+  new File(['hello world'], 'hello.txt', { type: 'text/plain' }),
+)
 let file = await storage.get('uploads/hello.txt')
 await storage.remove('uploads/hello.txt')
 ```
