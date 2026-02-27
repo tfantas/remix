@@ -13,10 +13,12 @@ Keep headings sparse and focus on the problem/feature explanation, context links
 ## Workflow
 
 1. Gather context from branch diff and related work.
+
 - Capture what changed, why it changed, and who it affects.
 - Find related issues/PRs and include links when relevant.
 
 1. Draft the PR body with minimal structure.
+
 - Start with 1-2 short introductory paragraphs.
 - In those intro paragraphs, include clear bullets describing:
   - the feature and/or issue addressed
@@ -25,15 +27,19 @@ Keep headings sparse and focus on the problem/feature explanation, context links
 - If the change is extensive, expand to up to 3-4 paragraphs and include background context with related links.
 
 1. Add required usage examples for feature work.
+
 - If the PR introduces a new feature, include a comprehensive usage snippet.
 - If it replaces or improves an older approach, include before/after examples.
 
 1. Exclude redundant sections.
+
 - Do not include `Validation`, `Testing`, or other process sections that are already implicit in PR workflow.
 - Do not add boilerplate sections that do not help review.
 
 1. Create the PR.
+
 - Save the body to a temporary file and run:
+
 ```bash
 gh pr create --base main --head <branch> --title "<title>" --body-file <file>
 ```
@@ -42,7 +48,7 @@ gh pr create --base main --head <branch> --title "<title>" --body-file <file>
 
 Use this as a base and fill with concrete repo-specific details:
 
-```md
+````md
 <One or two short intro paragraphs explaining the change and why it matters.>
 
 - <Feature/issue addressed>
@@ -54,6 +60,7 @@ Use this as a base and fill with concrete repo-specific details:
 ```ts
 // New feature usage example
 ```
+````
 
 ```ts
 // Before
@@ -62,4 +69,7 @@ Use this as a base and fill with concrete repo-specific details:
 ```ts
 // After
 ```
+
+```
+
 ```

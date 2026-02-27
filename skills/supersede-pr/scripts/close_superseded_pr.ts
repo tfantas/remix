@@ -18,14 +18,33 @@ function main(): void {
     fail('old_pr and new_pr must be different.')
   }
 
-  let repo = parsed.repo ?? ghCapture(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'])
-  let oldState = ghCapture(['pr', 'view', parsed.oldPr, '--repo', repo, '--json', 'state', '-q', '.state'])
-  let newState = ghCapture(['pr', 'view', parsed.newPr, '--repo', repo, '--json', 'state', '-q', '.state'])
+  let repo =
+    parsed.repo ?? ghCapture(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'])
+  let oldState = ghCapture([
+    'pr',
+    'view',
+    parsed.oldPr,
+    '--repo',
+    repo,
+    '--json',
+    'state',
+    '-q',
+    '.state',
+  ])
+  let newState = ghCapture([
+    'pr',
+    'view',
+    parsed.newPr,
+    '--repo',
+    repo,
+    '--json',
+    'state',
+    '-q',
+    '.state',
+  ])
 
   if (newState !== 'OPEN' && newState !== 'MERGED') {
-    fail(
-      `Replacement PR #${parsed.newPr} is in state '${newState}'. Expected OPEN or MERGED.`,
-    )
+    fail(`Replacement PR #${parsed.newPr} is in state '${newState}'. Expected OPEN or MERGED.`)
   }
 
   if (oldState !== 'OPEN') {
@@ -47,7 +66,17 @@ function main(): void {
 
   ghInherit(['pr', 'close', parsed.oldPr, '--repo', repo, '--comment', comment])
 
-  let finalState = ghCapture(['pr', 'view', parsed.oldPr, '--repo', repo, '--json', 'state', '-q', '.state'])
+  let finalState = ghCapture([
+    'pr',
+    'view',
+    parsed.oldPr,
+    '--repo',
+    repo,
+    '--json',
+    'state',
+    '-q',
+    '.state',
+  ])
   if (finalState !== 'CLOSED') {
     fail(`Failed to close PR #${parsed.oldPr}. Final state: ${finalState}`)
   }
