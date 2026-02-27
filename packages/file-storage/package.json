@@ -22,7 +22,6 @@
     ".": "./src/index.ts",
     "./fs": "./src/fs.ts",
     "./memory": "./src/memory.ts",
-    "./s3": "./src/s3.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -39,17 +38,12 @@
         "types": "./dist/memory.d.ts",
         "default": "./dist/memory.js"
       },
-      "./s3": {
-        "types": "./dist/s3.d.ts",
-        "default": "./dist/s3.js"
-      },
       "./package.json": "./package.json"
     }
   },
   "dependencies": {
     "@remix-run/fs": "workspace:^",
-    "@remix-run/lazy-file": "workspace:^",
-    "aws4fetch": "^1.0.20"
+    "@remix-run/lazy-file": "workspace:^"
   },
   "devDependencies": {
     "@remix-run/form-data-parser": "workspace:*",
