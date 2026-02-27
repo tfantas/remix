@@ -5,7 +5,7 @@ Key/value storage interfaces for server-side [`File` objects](https://developer.
 ## Features
 
 - **Simple API** - Intuitive key/value API (like [Web Storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API), but for `File`s instead of strings)
-- **Generic Interface** - `FileStorage` interface that works for various large object storage backends (can be adapted to AWS S3, Cloudflare R2, etc.)
+- **Multiple Backends** - Built-in filesystem, memory, and S3-compatible object storage backends
 - **Streaming Support** - Stream file content to and from storage
 - **Metadata Preservation** - Preserves all `File` metadata including `file.name`, `file.type`, and `file.lastModified`
 
@@ -39,6 +39,27 @@ fileFromStorage.type // 'text/plain'
 // To remove from storage
 await storage.remove(key)
 ```
+
+### S3
+
+```ts
+import { createS3FileStorage } from 'remix/file-storage/s3'
+
+let storage = createS3FileStorage({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  bucket: 'my-app-uploads',
+  region: 'us-east-1',
+})
+
+let file = new File(['hello world'], 'hello.txt', { type: 'text/plain' })
+await storage.set('uploads/hello.txt', file)
+
+let fileFromStorage = await storage.get('uploads/hello.txt')
+await storage.remove('uploads/hello.txt')
+```
+
+For S3-compatible providers such as MinIO and LocalStack, set `endpoint` and `forcePathStyle: true`.
 
 ## Related Packages
 

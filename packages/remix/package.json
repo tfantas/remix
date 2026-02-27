@@ -41,6 +41,7 @@
     "./file-storage": "./src/file-storage.ts",
     "./file-storage/fs": "./src/file-storage/fs.ts",
     "./file-storage/memory": "./src/file-storage/memory.ts",
+    "./file-storage/s3": "./src/file-storage/s3.ts",
     "./form-data-middleware": "./src/form-data-middleware.ts",
     "./form-data-parser": "./src/form-data-parser.ts",
     "./fs": "./src/fs.ts",
@@ -166,6 +167,10 @@
       "./file-storage/memory": {
         "types": "./dist/file-storage/memory.d.ts",
         "default": "./dist/file-storage/memory.js"
+      },
+      "./file-storage/s3": {
+        "types": "./dist/file-storage/s3.d.ts",
+        "default": "./dist/file-storage/s3.js"
       },
       "./form-data-middleware": {
         "types": "./dist/form-data-middleware.d.ts",
