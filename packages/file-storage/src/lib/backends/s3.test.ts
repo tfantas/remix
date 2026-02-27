@@ -68,7 +68,10 @@ describe('s3 file storage', () => {
     let { cursor, files } = await storage.list()
     assert.equal(cursor, undefined)
     assert.equal(files.length, 5)
-    assert.deepEqual(files.map((file) => file.key), allKeys)
+    assert.deepEqual(
+      files.map((file) => file.key),
+      allKeys,
+    )
 
     let { cursor: cursor1, files: files1 } = await storage.list({ limit: 0 })
     assert.equal(cursor1, undefined)
@@ -81,7 +84,10 @@ describe('s3 file storage', () => {
     let { cursor: cursor3, files: files3 } = await storage.list({ cursor: cursor2 })
     assert.equal(cursor3, undefined)
     assert.equal(files3.length, 3)
-    assert.deepEqual([...files2, ...files3].map((file) => file.key), allKeys)
+    assert.deepEqual(
+      [...files2, ...files3].map((file) => file.key),
+      allKeys,
+    )
   })
 
   it('lists files by key prefix', async () => {
@@ -149,7 +155,10 @@ describe('s3 file storage', () => {
       fetch: createMockS3Fetch(),
     })
 
-    await storage.set('dir/hello.txt', new File(['Hello, world!'], 'hello.txt', { type: 'text/plain' }))
+    await storage.set(
+      'dir/hello.txt',
+      new File(['Hello, world!'], 'hello.txt', { type: 'text/plain' }),
+    )
 
     assert.ok(await storage.has('dir/hello.txt'))
     let retrieved = await storage.get('dir/hello.txt')
@@ -247,7 +256,8 @@ function listObjects(url: URL, bucket: string, objects: Map<string, StoredObject
     .filter((key) => key.startsWith(prefix))
     .sort()
 
-  let startIndex = continuationToken == null ? 0 : keys.findIndex((key) => key === continuationToken) + 1
+  let startIndex =
+    continuationToken == null ? 0 : keys.findIndex((key) => key === continuationToken) + 1
   if (startIndex < 0) {
     startIndex = 0
   }
@@ -316,7 +326,10 @@ function createObjectResponse(object: StoredObject, headOnly: boolean): Response
 
 function parseBucketAndKey(url: URL): { bucket: string | undefined; key: string } {
   let hostStyleBucket = url.hostname.startsWith(`${BUCKET}.`) ? BUCKET : undefined
-  let pathSegments = url.pathname.replace(/^\/+/, '').split('/').filter((segment) => segment !== '')
+  let pathSegments = url.pathname
+    .replace(/^\/+/, '')
+    .split('/')
+    .filter((segment) => segment !== '')
 
   if (hostStyleBucket != null) {
     return {

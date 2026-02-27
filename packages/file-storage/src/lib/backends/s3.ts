@@ -151,7 +151,8 @@ export function createS3FileStorage(options: S3FileStorageOptions): FileStorage 
 
       return new File(
         [body],
-        decodeMetadataValue(response.headers.get('x-amz-meta-file-name')) ?? getDefaultFileName(key),
+        decodeMetadataValue(response.headers.get('x-amz-meta-file-name')) ??
+          getDefaultFileName(key),
         {
           lastModified:
             parseEpochMillis(response.headers.get('x-amz-meta-file-last-modified')) ??

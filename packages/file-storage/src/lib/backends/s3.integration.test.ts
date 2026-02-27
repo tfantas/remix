@@ -57,35 +57,31 @@ describe('s3 file storage integration', () => {
     await clearStorage(storage)
   })
 
-  it(
-    'stores and retrieves files',
-    { skip: !integrationEnabled },
-    async () => {
-      let lastModified = Date.now()
-      let file = new File(['Hello, world!'], 'hello.txt', {
-        type: 'text/plain',
-        lastModified,
-      })
+  it('stores and retrieves files', { skip: !integrationEnabled }, async () => {
+    let lastModified = Date.now()
+    let file = new File(['Hello, world!'], 'hello.txt', {
+      type: 'text/plain',
+      lastModified,
+    })
 
-      await storage.set('hello', file)
+    await storage.set('hello', file)
 
-      assert.ok(await storage.has('hello'))
+    assert.ok(await storage.has('hello'))
 
-      let retrieved = await storage.get('hello')
+    let retrieved = await storage.get('hello')
 
-      assert.ok(retrieved)
-      assert.equal(retrieved.name, 'hello.txt')
-      assert.equal(retrieved.type, 'text/plain')
-      assert.equal(retrieved.lastModified, lastModified)
-      assert.equal(retrieved.size, 13)
-      assert.equal(await retrieved.text(), 'Hello, world!')
+    assert.ok(retrieved)
+    assert.equal(retrieved.name, 'hello.txt')
+    assert.equal(retrieved.type, 'text/plain')
+    assert.equal(retrieved.lastModified, lastModified)
+    assert.equal(retrieved.size, 13)
+    assert.equal(await retrieved.text(), 'Hello, world!')
 
-      await storage.remove('hello')
+    await storage.remove('hello')
 
-      assert.ok(!(await storage.has('hello')))
-      assert.equal(await storage.get('hello'), null)
-    },
-  )
+    assert.ok(!(await storage.has('hello')))
+    assert.equal(await storage.get('hello'), null)
+  })
 
   it(
     'lists files with pagination and prefix filtering',
@@ -115,28 +111,24 @@ describe('s3 file storage integration', () => {
     },
   )
 
-  it(
-    'lists files with metadata',
-    { skip: !integrationEnabled },
-    async () => {
-      let lastModified = Date.now()
-      let file = new File(['Hello, world!'], 'hello.txt', {
-        type: 'text/plain',
-        lastModified,
-      })
+  it('lists files with metadata', { skip: !integrationEnabled }, async () => {
+    let lastModified = Date.now()
+    let file = new File(['Hello, world!'], 'hello.txt', {
+      type: 'text/plain',
+      lastModified,
+    })
 
-      await storage.set('hello', file)
+    await storage.set('hello', file)
 
-      let { files } = await storage.list({ includeMetadata: true })
+    let { files } = await storage.list({ includeMetadata: true })
 
-      assert.equal(files.length, 1)
-      assert.equal(files[0].key, 'hello')
-      assert.equal(files[0].name, 'hello.txt')
-      assert.equal(files[0].type, 'text/plain')
-      assert.equal(files[0].lastModified, lastModified)
-      assert.equal(files[0].size, 13)
-    },
-  )
+    assert.equal(files.length, 1)
+    assert.equal(files[0].key, 'hello')
+    assert.equal(files[0].name, 'hello.txt')
+    assert.equal(files[0].type, 'text/plain')
+    assert.equal(files[0].lastModified, lastModified)
+    assert.equal(files[0].size, 13)
+  })
 })
 
 async function ensureBucketExists(client: AwsClient, bucketUrl: URL): Promise<void> {
