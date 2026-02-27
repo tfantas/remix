@@ -125,7 +125,10 @@ describe('mysql sql-compiler', () => {
     })
 
     it('compile in-list predicates', async () => {
-      await db.query(accounts).where(inList('id', [1, 2])).all()
+      await db
+        .query(accounts)
+        .where(inList('id', [1, 2]))
+        .all()
 
       let compiled = compileMysqlStatement(statements[0])
       assert.deepEqual(compiled, {
@@ -145,7 +148,10 @@ describe('mysql sql-compiler', () => {
     })
 
     it('compile not-in predicates', async () => {
-      await db.query(accounts).where(notInList('id', [1, 2])).all()
+      await db
+        .query(accounts)
+        .where(notInList('id', [1, 2]))
+        .all()
 
       let compiled = compileMysqlStatement(statements[0])
       assert.deepEqual(compiled, {
