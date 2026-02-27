@@ -184,10 +184,7 @@ describe('postgres adapter', () => {
 
     let db = createDatabase(createPostgresDatabaseAdapter(client as never))
 
-    await db
-      .query(invoices)
-      .join(accounts, eq(accounts.id, invoices.account_id))
-      .count()
+    await db.query(invoices).join(accounts, eq(accounts.id, invoices.account_id)).count()
 
     assert.match(statements[0].text, /from "billing"\."invoices"/)
     assert.match(statements[0].text, /join "accounts"/)
