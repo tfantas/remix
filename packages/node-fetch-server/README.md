@@ -231,7 +231,7 @@ let server = http.createServer(async (req, res) => {
     // Process the request with your handler
     let response = await handler(request)
     // Make sure the response is mutable
-    response = new Response(response.body, response);
+    response = new Response(response.body, response)
 
     // Add response timing header
     let duration = Date.now() - startTime
