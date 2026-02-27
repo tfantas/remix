@@ -93,7 +93,9 @@ export function createRedisSessionStorage(
           let expire = client.expire
 
           if (expire == null) {
-            throw new Error('Redis client must implement setEx() or expire() when ttl is configured')
+            throw new Error(
+              'Redis client must implement setEx() or expire() when ttl is configured',
+            )
           }
 
           await client.set(key, value)
