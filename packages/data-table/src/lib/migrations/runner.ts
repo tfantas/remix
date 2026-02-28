@@ -1,0 +1,324 @@
+import { createDatabase } from '../database.ts'
+import type { Database } from '../database.ts'
+import type { DatabaseAdapter, TransactionToken } from '../adapter.ts'
+import type {
+  MigrateOptions,
+  MigrateResult,
+  MigrationContext,
+  MigrationDescriptor,
+  MigrationDirection,
+  MigrationJournalRow,
+  MigrationRegistry,
+  MigrationRunner,
+  MigrationRunnerOptions,
+  MigrationStatus,
+  MigrationStatusEntry,
+} from '../migrations.ts'
+
+import {
+  deleteJournalRow,
+  ensureMigrationJournal,
+  getBatch,
+  hasMigrationJournal,
+  insertJournalRow,
+  loadJournalRows,
+  normalizeChecksum,
+} from './journal-store.ts'
+import { resolveMigrations } from './registry.ts'
+import { createSchemaApi } from './schema-api.ts'
+
+type RunMigrationsInput = {
+  adapter: DatabaseAdapter
+  migrations: MigrationDescriptor[]
+  tableName: string
+  direction: MigrationDirection
+  options: MigrateOptions
+}
+
+function assertStepOption(step: number | undefined): void {
+  if (step === undefined) {
+    return
+  }
+
+  if (!Number.isInteger(step) || step < 1) {
+    throw new Error('Invalid migration step option. Expected a positive integer.')
+  }
+}
+
+function assertTargetOption(migrations: MigrationDescriptor[], to: string | undefined): void {
+  if (!to) {
+    return
+  }
+
+  let target = migrations.find((migration) => migration.id === to)
+
+  if (!target) {
+    throw new Error('Unknown migration target: ' + to)
+  }
+}
+
+function assertNoMigrationDrift(migrations: MigrationDescriptor[], journal: MigrationJournalRow[]): void {
+  let migrationMap = new Map(migrations.map((migration) => [migration.id, migration]))
+
+  for (let row of journal) {
+    let migration = migrationMap.get(row.id)
+
+    if (!migration) {
+      continue
+    }
+
+    let expected = normalizeChecksum(migration)
+
+    if (expected !== row.checksum) {
+      throw new Error(
+        'Migration checksum drift detected for "' +
+          row.id +
+          '" (journal=' +
+          row.checksum +
+          ', current=' +
+          expected +
+          ')',
+      )
+    }
+  }
+}
+
+function createDryRunDatabase(adapter: DatabaseAdapter): Database {
+  let error = new Error('Cannot execute data operations while running migrations with dryRun')
+  let throwDryRunError = async (): Promise<never> => {
+    throw error
+  }
+  let dryRunAdapter: DatabaseAdapter = {
+    dialect: adapter.dialect,
+    capabilities: adapter.capabilities,
+    compileSql(operation) {
+      return adapter.compileSql(operation)
+    },
+    execute: throwDryRunError,
+    migrate: throwDryRunError,
+    beginTransaction: throwDryRunError,
+    commitTransaction: throwDryRunError,
+    rollbackTransaction: throwDryRunError,
+    createSavepoint: throwDryRunError,
+    rollbackToSavepoint: throwDryRunError,
+    releaseSavepoint: throwDryRunError,
+  }
+
+  return createDatabase(dryRunAdapter)
+}
+
+async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> {
+  let adapter = input.adapter
+  let migrations = input.migrations
+  let tableName = input.tableName
+  let dryRun = Boolean(input.options.dryRun)
+  let target = input.options.to
+  let step = input.options.step
+
+  assertStepOption(step)
+  assertTargetOption(migrations, target)
+
+  let sql: Array<{ text: string; values: unknown[] }> = []
+
+  await adapter.acquireMigrationLock?.()
+
+  try {
+    let journal: MigrationJournalRow[] = []
+
+    if (dryRun) {
+      let canReadJournal = await hasMigrationJournal(adapter, tableName)
+
+      if (canReadJournal) {
+        journal = await loadJournalRows(adapter, tableName)
+      }
+    } else {
+      await ensureMigrationJournal(adapter, tableName)
+      journal = await loadJournalRows(adapter, tableName)
+    }
+
+    let appliedMap = new Map(journal.map((row) => [row.id, row]))
+    assertNoMigrationDrift(migrations, journal)
+    let toRun: MigrationDescriptor[] = []
+
+    if (input.direction === 'up') {
+      for (let migration of migrations) {
+        if (!appliedMap.has(migration.id)) {
+          toRun.push(migration)
+        }
+      }
+
+      if (target) {
+        toRun = toRun.filter((migration) => migration.id <= target)
+      }
+
+      if (step !== undefined) {
+        toRun = toRun.slice(0, step)
+      }
+    } else {
+      let appliedMigrations = migrations.filter((migration) => appliedMap.has(migration.id)).reverse()
+
+      if (target) {
+        appliedMigrations = appliedMigrations.filter((migration) => migration.id >= target)
+      }
+
+      if (step !== undefined) {
+        appliedMigrations = appliedMigrations.slice(0, step)
+      }
+
+      toRun = appliedMigrations
+    }
+
+    let applied: MigrationStatusEntry[] = []
+    let reverted: MigrationStatusEntry[] = []
+    let batch = getBatch(journal)
+
+    for (let migration of toRun) {
+      if (migration.migration.transaction === 'required' && !adapter.capabilities.transactionalDdl) {
+        throw new Error(
+          'Migration "' + migration.id + '" requires transactional DDL, but adapter does not support it',
+        )
+      }
+
+      let shouldUseTransaction =
+        !dryRun &&
+        migration.migration.transaction !== 'none' &&
+        adapter.capabilities.transactionalDdl
+      let token: TransactionToken | undefined
+      let db = dryRun ? createDryRunDatabase(adapter) : createDatabase(adapter)
+
+      if (shouldUseTransaction) {
+        token = await adapter.beginTransaction()
+      }
+
+      let schema = createSchemaApi(db, async (operation) => {
+        let compiled = adapter.compileSql(operation)
+        sql.push(...compiled)
+
+        if (!dryRun) {
+          await adapter.migrate({ operation, transaction: token })
+        }
+      })
+
+      let context: MigrationContext = {
+        dialect: adapter.dialect,
+        schema,
+        db,
+      }
+
+      try {
+        if (input.direction === 'up') {
+          await migration.migration.up(context)
+
+          if (!dryRun) {
+            await insertJournalRow(
+              adapter,
+              tableName,
+              {
+                id: migration.id,
+                name: migration.name,
+                checksum: normalizeChecksum(migration),
+                batch,
+              },
+              token,
+            )
+          }
+
+          applied.push({
+            id: migration.id,
+            name: migration.name,
+            status: 'applied',
+          })
+        } else {
+          await migration.migration.down(context)
+
+          if (!dryRun) {
+            await deleteJournalRow(adapter, tableName, migration.id, token)
+          }
+
+          reverted.push({
+            id: migration.id,
+            name: migration.name,
+            status: 'pending',
+          })
+        }
+
+        if (token) {
+          await adapter.commitTransaction(token)
+        }
+      } catch (error) {
+        if (token) {
+          await adapter.rollbackTransaction(token)
+        }
+
+        throw error
+      }
+    }
+
+    return {
+      applied,
+      reverted,
+      sql,
+    }
+  } finally {
+    await adapter.releaseMigrationLock?.()
+  }
+}
+
+export function createMigrationRunner(
+  adapter: DatabaseAdapter,
+  migrations: MigrationDescriptor[] | MigrationRegistry,
+  options: MigrationRunnerOptions = {},
+): MigrationRunner {
+  let tableName = options.tableName ?? 'data_table_migrations'
+
+  return {
+    async up(runOptions: MigrateOptions = {}): Promise<MigrateResult> {
+      return runMigrations({
+        adapter,
+        migrations: resolveMigrations(migrations),
+        tableName,
+        direction: 'up',
+        options: runOptions,
+      })
+    },
+    async down(runOptions: MigrateOptions = {}): Promise<MigrateResult> {
+      return runMigrations({
+        adapter,
+        migrations: resolveMigrations(migrations),
+        tableName,
+        direction: 'down',
+        options: runOptions,
+      })
+    },
+    async status(): Promise<MigrationStatusEntry[]> {
+      await ensureMigrationJournal(adapter, tableName)
+
+      let journal = await loadJournalRows(adapter, tableName)
+      let journalMap = new Map(journal.map((row) => [row.id, row]))
+      let sortedMigrations = resolveMigrations(migrations)
+
+      return sortedMigrations.map((migration) => {
+        let journalRow = journalMap.get(migration.id)
+
+        if (!journalRow) {
+          return {
+            id: migration.id,
+            name: migration.name,
+            status: 'pending' as MigrationStatus,
+          }
+        }
+
+        let checksum = normalizeChecksum(migration)
+
+        return {
+          id: migration.id,
+          name: migration.name,
+          status: checksum === journalRow.checksum ? ('applied' as MigrationStatus) : ('drifted' as MigrationStatus),
+          appliedAt: journalRow.appliedAt,
+          batch: journalRow.batch,
+          checksum: journalRow.checksum,
+        }
+      })
+    },
+  }
+}

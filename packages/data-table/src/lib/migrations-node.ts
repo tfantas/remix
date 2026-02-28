@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Migration, MigrationDescriptor } from './migrations.ts'
-import { parseMigrationFilename } from './migrations.ts'
+import { parseMigrationFilename } from './migrations/filename.ts'
 
 export async function loadMigrations(directory: string): Promise<MigrationDescriptor[]> {
   let allFiles = (await fs.readdir(directory, { withFileTypes: true }))

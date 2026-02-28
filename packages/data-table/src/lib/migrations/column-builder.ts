@@ -3,7 +3,7 @@ import type {
   ForeignKeyAction,
   IdentityOptions,
   TableRef,
-} from './adapter.ts'
+} from '../adapter.ts'
 
 function toTableRef(name: string): TableRef {
   let segments = name.split('.')

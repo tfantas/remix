@@ -16,6 +16,7 @@
 - **Monorepo**: pnpm workspace with packages in `packages/` directory
 - **Key packages**: headers, fetch-proxy, fetch-router, file-storage, form-data-parser, lazy-file, multipart-parser, node-fetch-server, route-pattern, tar-parser
 - **Package exports**: All `exports` in `package.json` have a dedicated file in `src` that defines the public API by re-exporting from within `src/lib`
+- **Lib module boundaries**: Files in `src/lib` are implementation files. Do not add barrel-style re-exports or thin pass-through wrapper APIs between `src/lib` files. Re-exporting belongs only in top-level `src` barrel files that map to package exports.
 - **Cross-package boundaries**: Avoid re-exporting APIs/types from other packages. Consumers should import from the owning package directly. Reuse shared concepts from sibling packages internally instead of creating bespoke duplicate implementations.
 - **Documentation imports/install**: In package READMEs, documentation, and pull request code examples, installation instructions should always include `npm i remix`, usage examples should import from `remix` package exports (not `@remix-run/*`), and any required peer dependency should be included in the installation command.
 - **Philosophy**: Web standards-first, runtime-agnostic (Node.js, Bun, Deno, Cloudflare Workers). Use Web Streams API, Uint8Array, Web Crypto API, Blob/File instead of Node.js APIs

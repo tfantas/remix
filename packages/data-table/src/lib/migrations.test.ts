@@ -10,13 +10,11 @@ import type {
   DatabaseAdapter,
   TransactionToken,
 } from './adapter.ts'
-import {
-  column,
-  createMigration,
-  createMigrationRegistry,
-  createMigrationRunner,
-  parseMigrationFilename,
-} from './migrations.ts'
+import { column } from './migrations/column-builder.ts'
+import { parseMigrationFilename } from './migrations/filename.ts'
+import { createMigrationRegistry } from './migrations/registry.ts'
+import { createMigrationRunner } from './migrations/runner.ts'
+import { createMigration } from './migrations.ts'
 import type { SqlStatement } from './sql.ts'
 
 type JournalRow = {
