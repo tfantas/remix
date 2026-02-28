@@ -1,7 +1,7 @@
 {
   "name": "@remix-run/component",
   "version": "0.5.0",
-  "description": "Web components for Remix",
+  "description": "UI components for Remix",
   "author": "Ryan Florence <rpflorence@gmail.com>",
   "license": "MIT",
   "repository": {
