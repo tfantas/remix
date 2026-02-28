@@ -485,6 +485,299 @@ describe('mysql adapter', () => {
     assert.equal(result.insertId, undefined)
   })
 
+  it('preserves numeric count values without coercion', async () => {
+    let connection = {
+      async query() {
+        return [[{ count: 7 }], []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    }
+
+    let db = createDatabase(createMysqlDatabaseAdapter(connection as never))
+    let count = await db.query(accounts).count()
+
+    assert.equal(count, 7)
+  })
+
+  it('does not expose insertId for non-insert writes', async () => {
+    let connection = {
+      async query() {
+        return [{ affectedRows: 1, insertId: 99 }, []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    }
+
+    let db = createDatabase(createMysqlDatabaseAdapter(connection as never))
+    let result = await db.updateMany(
+      accounts,
+      { email: 'updated@example.com' },
+      { where: { id: 1 } },
+    )
+
+    assert.equal(result.affectedRows, 1)
+    assert.equal(result.insertId, undefined)
+  })
+
+  it('executes migrate operations and migration lock hooks', async () => {
+    let statements: Array<{ text: string; values: unknown[] }> = []
+
+    let connection = {
+      async query(text: string, values: unknown[] = []) {
+        statements.push({ text, values })
+        return [{ affectedRows: 0, insertId: undefined }, []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    }
+
+    let adapter = createMysqlDatabaseAdapter(connection as never)
+
+    let result = await adapter.migrate({
+      operation: {
+        kind: 'alterTable',
+        table: { name: 'accounts' },
+        changes: [{ kind: 'setTableComment', comment: "owner's table" }],
+      },
+    })
+
+    await adapter.acquireMigrationLock()
+    await adapter.releaseMigrationLock()
+
+    assert.equal(result.affectedObjects, 1)
+    assert.deepEqual(statements[0], {
+      text: "alter table `accounts` comment = 'owner''s table'",
+      values: [],
+    })
+    assert.deepEqual(statements[1], {
+      text: 'select get_lock(?, 60)',
+      values: ['data_table_migrations'],
+    })
+    assert.deepEqual(statements[2], {
+      text: 'select release_lock(?)',
+      values: ['data_table_migrations'],
+    })
+  })
+
+  it('compiles migration statements for rich create and alter table operations', () => {
+    let adapter = createMysqlDatabaseAdapter({
+      async query() {
+        return [[], []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    } as never)
+
+    let createTableStatements = adapter.compileSql({
+      kind: 'createTable',
+      table: { name: 'users' },
+      ifNotExists: true,
+      columns: {
+        id: { type: 'integer', nullable: false, autoIncrement: true, primaryKey: true },
+        email: { type: 'varchar' },
+        display_name: { type: 'text', default: { kind: 'literal', value: "o'hare" } },
+        created_at: { type: 'timestamp', default: { kind: 'now' } },
+        updated_at: { type: 'timestamp', default: { kind: 'sql', expression: '(current_timestamp)' } },
+        reviewed_at: {
+          type: 'timestamp',
+          default: { kind: 'literal', value: new Date('2026-01-01T00:00:00.000Z') },
+        },
+        optional_note: { type: 'text', default: { kind: 'literal', value: null } },
+        total: { type: 'decimal', precision: 10, scale: 2, default: { kind: 'literal', value: 3.5 } },
+        fallback_total: { type: 'decimal' },
+        is_active: { type: 'boolean', default: { kind: 'literal', value: false }, unique: true },
+        public_id: { type: 'uuid' },
+        due_on: { type: 'date' },
+        starts_at: { type: 'time' },
+        payload: { type: 'json' },
+        blob_data: { type: 'binary' },
+        big_total: { type: 'bigint', unsigned: true, default: { kind: 'literal', value: 9n } },
+        status: { type: 'enum', enumValues: ['active', 'disabled'] },
+        fallback_status: { type: 'enum', enumValues: [] },
+        derived_score: { type: 'integer', computed: { expression: '(points + 1)', stored: false } },
+        account_id: {
+          type: 'integer',
+          references: {
+            table: { schema: 'app', name: 'accounts' },
+            columns: ['id'],
+            onDelete: 'set null',
+            onUpdate: 'cascade',
+          },
+        },
+        guarded_value: {
+          type: 'integer',
+          checks: [{ expression: 'guarded_value > 0' }],
+        },
+        unknown_type: {
+          type: 'mystery' as any,
+        },
+      },
+      primaryKey: { columns: ['id'] },
+      uniques: [{ columns: ['email'] }, { name: 'users_status_unique', columns: ['status'] }],
+      checks: [
+        { expression: 'id > 0' },
+        { name: 'users_active_check', expression: 'is_active in (0, 1)' },
+      ],
+      foreignKeys: [
+        {
+          name: 'users_account_fk',
+          columns: ['account_id'],
+          references: { table: { name: 'accounts' }, columns: ['id'] },
+          onDelete: 'cascade',
+          onUpdate: 'restrict',
+        },
+      ],
+      comment: "users' table",
+    })
+
+    assert.equal(createTableStatements.length, 2)
+    assert.match(createTableStatements[0].text, /^create table if not exists `users`/)
+    assert.match(createTableStatements[0].text, /`email` varchar\(255\)/)
+    assert.match(createTableStatements[0].text, /`display_name` text default 'o''hare'/)
+    assert.match(
+      createTableStatements[0].text,
+      /`reviewed_at` timestamp default '2026-01-01T00:00:00\.000Z'/,
+    )
+    assert.match(createTableStatements[0].text, /`optional_note` text default null/)
+    assert.match(createTableStatements[0].text, /`total` decimal\(10, 2\) default 3\.5/)
+    assert.match(createTableStatements[0].text, /`fallback_total` decimal/)
+    assert.match(createTableStatements[0].text, /`is_active` boolean default false unique/)
+    assert.match(createTableStatements[0].text, /`public_id` char\(36\)/)
+    assert.match(createTableStatements[0].text, /`due_on` date/)
+    assert.match(createTableStatements[0].text, /`starts_at` time/)
+    assert.match(createTableStatements[0].text, /`payload` json/)
+    assert.match(createTableStatements[0].text, /`blob_data` blob/)
+    assert.match(createTableStatements[0].text, /`big_total` bigint unsigned default 9/)
+    assert.match(createTableStatements[0].text, /`status` enum\('active', 'disabled'\)/)
+    assert.match(createTableStatements[0].text, /`fallback_status` text/)
+    assert.match(
+      createTableStatements[0].text,
+      /`derived_score` int generated always as \(\(points \+ 1\)\) virtual/,
+    )
+    assert.match(
+      createTableStatements[0].text,
+      /`account_id` int references `app`\.`accounts` \(`id`\) on delete set null on update cascade/,
+    )
+    assert.match(createTableStatements[0].text, /`guarded_value` int check \(guarded_value > 0\)/)
+    assert.match(createTableStatements[0].text, /`unknown_type` text/)
+    assert.match(createTableStatements[0].text, /primary key \(`id`\)/)
+    assert.match(createTableStatements[0].text, /unique \(`email`\)/)
+    assert.match(
+      createTableStatements[0].text,
+      /constraint `users_status_unique` unique \(`status`\)/,
+    )
+    assert.match(createTableStatements[0].text, /check \(id > 0\)/)
+    assert.match(
+      createTableStatements[0].text,
+      /constraint `users_active_check` check \(is_active in \(0, 1\)\)/,
+    )
+    assert.match(
+      createTableStatements[0].text,
+      /constraint `users_account_fk` foreign key \(`account_id`\) references `accounts` \(`id`\) on delete cascade on update restrict/,
+    )
+    assert.deepEqual(createTableStatements[1], {
+      text: "alter table `users` comment = 'users'' table'",
+      values: [],
+    })
+
+    let alterTableStatements = adapter.compileSql({
+      kind: 'alterTable',
+      table: { schema: 'app', name: 'users' },
+      changes: [
+        { kind: 'addColumn', column: 'nickname', definition: { type: 'text' } },
+        {
+          kind: 'changeColumn',
+          column: 'nickname',
+          definition: {
+            type: 'text',
+            default: { kind: 'sql', expression: '(concat(first_name, last_name))' },
+            checks: [{ expression: 'char_length(nickname) > 1' }],
+          },
+        },
+        { kind: 'renameColumn', from: 'nickname', to: 'handle' },
+        { kind: 'dropColumn', column: 'legacy_handle' },
+        { kind: 'addPrimaryKey', constraint: { columns: ['id'] } },
+        { kind: 'dropPrimaryKey' },
+        { kind: 'addUnique', constraint: { columns: ['email'], name: 'users_email_unique' } },
+        { kind: 'dropUnique', name: 'users_email_unique' },
+        {
+          kind: 'addForeignKey',
+          constraint: {
+            columns: ['account_id'],
+            references: { table: { name: 'accounts' }, columns: ['id'] },
+            name: 'users_account_fk',
+          },
+        },
+        { kind: 'dropForeignKey', name: 'users_account_fk' },
+        {
+          kind: 'addCheck',
+          constraint: { expression: 'char_length(email) > 3', name: 'users_email_check' },
+        },
+        { kind: 'dropCheck', name: 'users_email_check' },
+        { kind: 'setTableComment', comment: "owner's users" },
+        { kind: 'somethingElse' as any },
+      ] as any,
+    })
+
+    assert.equal(alterTableStatements.length, 13)
+    assert.match(
+      alterTableStatements[1].text,
+      /alter table `app`\.`users` modify column `nickname` text default \(concat\(first_name, last_name\)\) check \(char_length\(nickname\) > 1\)/,
+    )
+    assert.match(alterTableStatements[2].text, /rename column `nickname` to `handle`/)
+    assert.match(alterTableStatements[3].text, /drop column `legacy_handle`/)
+    assert.match(alterTableStatements[4].text, /add primary key \(`id`\)/)
+    assert.match(alterTableStatements[5].text, /drop primary key/)
+    assert.match(
+      alterTableStatements[6].text,
+      /add constraint `users_email_unique` unique \(`email`\)/,
+    )
+    assert.match(alterTableStatements[7].text, /drop index `users_email_unique`/)
+    assert.match(
+      alterTableStatements[8].text,
+      /add constraint `users_account_fk` foreign key \(`account_id`\) references `accounts` \(`id`\)/,
+    )
+    assert.match(alterTableStatements[9].text, /drop foreign key `users_account_fk`/)
+    assert.match(
+      alterTableStatements[10].text,
+      /add constraint `users_email_check` check \(char_length\(email\) > 3\)/,
+    )
+    assert.match(alterTableStatements[11].text, /drop check `users_email_check`/)
+    assert.equal(alterTableStatements[12].text, "alter table `app`.`users` comment = 'owner''s users'")
+
+    let createIndexWithoutName = adapter.compileSql({
+      kind: 'createIndex',
+      index: {
+        table: { name: 'users' },
+        columns: ['email'],
+      },
+    })
+
+    assert.equal(createIndexWithoutName.length, 1)
+    assert.match(createIndexWithoutName[0].text, /create index `email_idx` on `users`/)
+  })
+
+  it('throws for unsupported data migration operation kinds', () => {
+    let adapter = createMysqlDatabaseAdapter({
+      async query() {
+        return [[], []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    } as never)
+
+    assert.throws(
+      () => adapter.compileSql({ kind: 'unsupported_migration_operation' } as any),
+      /Unsupported data migration operation kind/,
+    )
+  })
+
   it('compiles every DDL statement kind through compileSql()', () => {
     let adapter = createMysqlDatabaseAdapter({
       async query() {

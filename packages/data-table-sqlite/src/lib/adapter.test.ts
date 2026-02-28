@@ -264,6 +264,314 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
     assert.equal(result.insertId, undefined)
   })
 
+  it('does not expose insertId for composite primary keys in reader mode', async () => {
+    let sqlite = {
+      prepare() {
+        return {
+          reader: true,
+          all() {
+            return [{ account_id: 1, project_id: 2 }]
+          },
+          run() {
+            return { changes: 1, lastInsertRowid: 42 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let adapter = createSqliteDatabaseAdapter(sqlite as never)
+    let result = await adapter.execute({
+      operation: {
+        kind: 'insert',
+        table: accountProjects,
+        values: {
+          account_id: 1,
+          project_id: 2,
+          email: 'team@example.com',
+        },
+        returning: ['account_id', 'project_id'],
+      },
+      transaction: undefined,
+    })
+
+    assert.equal(result.affectedRows, 1)
+    assert.equal(result.insertId, undefined)
+  })
+
+  it('does not expose insertId for non-insert writes', async () => {
+    let sqlite = {
+      prepare() {
+        return {
+          reader: false,
+          all() {
+            return []
+          },
+          run() {
+            return { changes: 1, lastInsertRowid: 99 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let db = createDatabase(createSqliteDatabaseAdapter(sqlite as never))
+    let result = await db.updateMany(accounts, { status: 'inactive' }, { where: { id: 1 } })
+
+    assert.equal(result.affectedRows, 1)
+    assert.equal(result.insertId, undefined)
+  })
+
+  it('executes migrate operations', async () => {
+    let statements: Array<{ text: string; values: unknown[] }> = []
+
+    let sqlite = {
+      prepare(text: string) {
+        return {
+          reader: false,
+          all() {
+            return []
+          },
+          run(...values: unknown[]) {
+            statements.push({ text, values })
+            return { changes: 0, lastInsertRowid: 0 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let adapter = createSqliteDatabaseAdapter(sqlite as never)
+    let result = await adapter.migrate({
+      operation: {
+        kind: 'dropCheck',
+        table: { name: 'accounts' },
+        name: 'accounts_status_check',
+      },
+    })
+
+    assert.equal(result.affectedObjects, 1)
+    assert.deepEqual(statements[0], {
+      text: 'alter table "accounts" drop constraint "accounts_status_check"',
+      values: [],
+    })
+  })
+
+  it('compiles migration statements for rich create and alter operations', () => {
+    let sqlite = {
+      prepare() {
+        return {
+          reader: false,
+          all() {
+            return []
+          },
+          run() {
+            return { changes: 0, lastInsertRowid: 0 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let adapter = createSqliteDatabaseAdapter(sqlite as never)
+
+    let createTableStatements = adapter.compileSql({
+      kind: 'createTable',
+      table: { name: 'users' },
+      ifNotExists: true,
+      columns: {
+        id: { type: 'integer', nullable: false, primaryKey: true },
+        email: { type: 'varchar', unique: true },
+        display_name: { type: 'text', default: { kind: 'literal', value: "o'hare" } },
+        created_at: { type: 'timestamp', default: { kind: 'now' } },
+        updated_at: { type: 'timestamp', default: { kind: 'sql', expression: '(current_timestamp)' } },
+        reviewed_at: {
+          type: 'timestamp',
+          default: { kind: 'literal', value: new Date('2026-01-01T00:00:00.000Z') },
+        },
+        optional_note: { type: 'text', default: { kind: 'literal', value: null } },
+        total: { type: 'decimal', default: { kind: 'literal', value: 3.5 } },
+        is_active: { type: 'boolean', default: { kind: 'literal', value: false } },
+        public_id: { type: 'uuid' },
+        due_on: { type: 'date' },
+        starts_at: { type: 'time' },
+        payload: { type: 'json' },
+        blob_data: { type: 'binary' },
+        big_total: { type: 'bigint', default: { kind: 'literal', value: 9n } },
+        status: { type: 'enum', enumValues: ['active', 'disabled'] },
+        derived_score: { type: 'integer', computed: { expression: '(points + 1)', stored: false } },
+        account_id: {
+          type: 'integer',
+          references: {
+            table: { schema: 'app', name: 'accounts' },
+            columns: ['id'],
+            onDelete: 'set null',
+            onUpdate: 'cascade',
+          },
+        },
+        guarded_value: {
+          type: 'integer',
+          checks: [{ expression: 'guarded_value > 0' }],
+        },
+        unknown_type: {
+          type: 'mystery' as any,
+        },
+      },
+      primaryKey: { columns: ['id'] },
+      uniques: [{ columns: ['email'] }, { name: 'users_email_unique', columns: ['email'] }],
+      checks: [
+        { expression: 'id > 0' },
+        { name: 'users_active_check', expression: 'is_active in (0, 1)' },
+      ],
+      foreignKeys: [
+        {
+          name: 'users_account_fk',
+          columns: ['account_id'],
+          references: { table: { name: 'accounts' }, columns: ['id'] },
+          onDelete: 'cascade',
+          onUpdate: 'restrict',
+        },
+      ],
+    })
+
+    assert.equal(createTableStatements.length, 1)
+    assert.match(createTableStatements[0].text, /^create table if not exists "users"/)
+    assert.match(createTableStatements[0].text, /"email" text unique/)
+    assert.match(createTableStatements[0].text, /"display_name" text default 'o''hare'/)
+    assert.match(
+      createTableStatements[0].text,
+      /"reviewed_at" text default '2026-01-01T00:00:00\.000Z'/,
+    )
+    assert.match(createTableStatements[0].text, /"optional_note" text default null/)
+    assert.match(createTableStatements[0].text, /"total" numeric default 3\.5/)
+    assert.match(createTableStatements[0].text, /"is_active" integer default 0/)
+    assert.match(createTableStatements[0].text, /"public_id" text/)
+    assert.match(createTableStatements[0].text, /"due_on" text/)
+    assert.match(createTableStatements[0].text, /"starts_at" text/)
+    assert.match(createTableStatements[0].text, /"payload" text/)
+    assert.match(createTableStatements[0].text, /"blob_data" blob/)
+    assert.match(createTableStatements[0].text, /"big_total" integer default 9/)
+    assert.match(createTableStatements[0].text, /"status" text/)
+    assert.match(
+      createTableStatements[0].text,
+      /"derived_score" integer generated always as \(\(points \+ 1\)\) virtual/,
+    )
+    assert.match(
+      createTableStatements[0].text,
+      /"account_id" integer references "app"\."accounts" \("id"\) on delete set null on update cascade/,
+    )
+    assert.match(createTableStatements[0].text, /"guarded_value" integer check \(guarded_value > 0\)/)
+    assert.match(createTableStatements[0].text, /"unknown_type" text/)
+    assert.match(createTableStatements[0].text, /primary key \("id"\)/)
+    assert.match(createTableStatements[0].text, /unique \("email"\)/)
+    assert.match(
+      createTableStatements[0].text,
+      /constraint "users_email_unique" unique \("email"\)/,
+    )
+    assert.match(createTableStatements[0].text, /check \(id > 0\)/)
+    assert.match(
+      createTableStatements[0].text,
+      /constraint "users_active_check" check \(is_active in \(0, 1\)\)/,
+    )
+    assert.match(
+      createTableStatements[0].text,
+      /constraint "users_account_fk" foreign key \("account_id"\) references "accounts" \("id"\) on delete cascade on update restrict/,
+    )
+
+    let alterTableStatements = adapter.compileSql({
+      kind: 'alterTable',
+      table: { schema: 'app', name: 'users' },
+      changes: [
+        { kind: 'addColumn', column: 'nickname', definition: { type: 'text' } },
+        { kind: 'changeColumn', column: 'nickname', definition: { type: 'text' } },
+        { kind: 'renameColumn', from: 'nickname', to: 'handle' },
+        { kind: 'dropColumn', column: 'legacy_handle' },
+        { kind: 'addPrimaryKey', constraint: { columns: ['id'] } },
+        { kind: 'dropPrimaryKey' },
+        { kind: 'addUnique', constraint: { columns: ['email'], name: 'users_email_unique' } },
+        { kind: 'dropUnique', name: 'users_email_unique' },
+        {
+          kind: 'addForeignKey',
+          constraint: {
+            columns: ['account_id'],
+            references: { table: { name: 'accounts' }, columns: ['id'] },
+            name: 'users_account_fk',
+          },
+        },
+        { kind: 'dropForeignKey', name: 'users_account_fk' },
+        {
+          kind: 'addCheck',
+          constraint: { expression: 'length(email) > 3', name: 'users_email_check' },
+        },
+        { kind: 'dropCheck', name: 'users_email_check' },
+        { kind: 'setTableComment', comment: "owner's users" },
+        { kind: 'somethingElse' as any },
+      ] as any,
+    })
+
+    assert.equal(alterTableStatements.length, 12)
+    assert.match(alterTableStatements[1].text, /alter column "nickname" type text/)
+    assert.match(alterTableStatements[2].text, /rename column "nickname" to "handle"/)
+    assert.match(alterTableStatements[3].text, /drop column "legacy_handle"/)
+    assert.match(alterTableStatements[4].text, /add primary key \("id"\)/)
+    assert.match(alterTableStatements[5].text, /drop primary key/)
+    assert.match(
+      alterTableStatements[6].text,
+      /add constraint "users_email_unique" unique \("email"\)/,
+    )
+    assert.match(alterTableStatements[7].text, /drop constraint "users_email_unique"/)
+    assert.match(
+      alterTableStatements[8].text,
+      /add constraint "users_account_fk" foreign key \("account_id"\) references "accounts" \("id"\)/,
+    )
+    assert.match(alterTableStatements[9].text, /drop constraint "users_account_fk"/)
+    assert.match(
+      alterTableStatements[10].text,
+      /add constraint "users_email_check" check \(length\(email\) > 3\)/,
+    )
+    assert.match(alterTableStatements[11].text, /drop constraint "users_email_check"/)
+
+    let createIndexWithoutName = adapter.compileSql({
+      kind: 'createIndex',
+      index: {
+        table: { name: 'users' },
+        columns: ['email'],
+      },
+    })
+
+    assert.equal(createIndexWithoutName.length, 1)
+    assert.match(createIndexWithoutName[0].text, /create index "email_idx" on "users"/)
+  })
+
+  it('throws for unsupported data migration operation kinds', () => {
+    let sqlite = {
+      prepare() {
+        return {
+          reader: false,
+          all() {
+            return []
+          },
+          run() {
+            return { changes: 0, lastInsertRowid: 0 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let adapter = createSqliteDatabaseAdapter(sqlite as never)
+
+    assert.throws(
+      () => adapter.compileSql({ kind: 'unsupported_migration_operation' } as any),
+      /Unsupported data migration operation kind/,
+    )
+  })
+
   it('supports typed writes, reads, and nested transactions', async () => {
     let sqlite = new Database(':memory:')
     sqlite.exec(
