@@ -25,6 +25,7 @@
 
 - **Imports**: Always use `import type { X }` for types (separate from value imports); use `export type { X }` for type exports; include `.ts` extensions
 - **One-off scripts**: Write one-off scripts in this repo as TypeScript and make them executable natively with modern Node.js (for example, executable `.ts` files)
+- **Node runtime assumption**: Assume a modern Node.js runtime that supports running TypeScript files natively; prefer `node path/to/script.ts` in examples and instructions.
 - **Variables**: Prefer `let` for locals, `const` only at module scope; never use `var`
 - **Functions**: Use regular function declarations/expressions by default. For callback-based APIs (array methods, Promise callbacks, test callbacks, transaction callbacks, etc.), prefer arrow functions over `function` expressions. When an arrow callback only returns a single expression, use a concise body (`value => expression`) instead of braces/`return`
 - **Object methods**: When defining functions in object literals, use shorthand method syntax (`{ method() {} }`) instead of arrow functions (`{ method: () => {} }`)

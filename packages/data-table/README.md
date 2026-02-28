@@ -350,11 +350,10 @@ try {
 Run it with your runtime, for example:
 
 ```sh
-tsx ./app/db/migrate.ts up
-tsx ./app/db/migrate.ts up 20260301113000
-tsx ./app/db/migrate.ts down
-tsx ./app/db/migrate.ts down 20260228090000
-# or run a compiled JavaScript build with node
+node ./app/db/migrate.ts up
+node ./app/db/migrate.ts up 20260301113000
+node ./app/db/migrate.ts down
+node ./app/db/migrate.ts down 20260228090000
 ```
 
 Use `step` when you want bounded rollforward/rollback behavior instead of a target id:
