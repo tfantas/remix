@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
-import type { DataDefinitionOperation } from '@remix-run/data-table'
+import type { DataMigrationOperation } from '@remix-run/data-table'
 import { createDatabase, createTable, eq, ilike, inList } from '@remix-run/data-table'
 
 import { createMysqlDatabaseAdapter } from './adapter.ts'
@@ -495,7 +495,7 @@ describe('mysql adapter', () => {
       async rollback() {},
     } as never)
 
-    let operations: DataDefinitionOperation[] = [
+    let operations: DataMigrationOperation[] = [
       {
         kind: 'createTable',
         table: { schema: 'app', name: 'users' },

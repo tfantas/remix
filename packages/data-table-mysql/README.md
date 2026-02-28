@@ -7,7 +7,7 @@ Use this package when you want `data-table` APIs backed by `mysql2`.
 
 - **Native `mysql2` Integration**: Works with `mysql2/promise` connection pools
 - **Full `data-table` API Support**: Queries, relations, writes, and transactions
-- **Migration DDL Support**: Compiles and executes `DataDefinitionOperation` operations for `remix/data-table/migrations`
+- **Migration DDL Support**: Compiles and executes `DataMigrationOperation` operations for `remix/data-table/migrations`
 - **MySQL Capabilities Enabled By Default**:
   - `returning: false`
   - `savepoints: true`
@@ -86,7 +86,7 @@ try {
 ## Related Packages
 
 - [`data-table`](https://github.com/remix-run/remix/tree/main/packages/data-table) - Core query/relations API
-- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema definitions and validation
+- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema parsing and validation
 - [`data-table-postgres`](https://github.com/remix-run/remix/tree/main/packages/data-table-postgres) - PostgreSQL adapter
 - [`data-table-sqlite`](https://github.com/remix-run/remix/tree/main/packages/data-table-sqlite) - SQLite adapter
 

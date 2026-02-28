@@ -4,7 +4,7 @@ import type {
   AlterTableChange,
   CheckConstraint,
   ColumnDefinition,
-  DataDefinitionOperation,
+  DataMigrationOperation,
   DatabaseAdapter,
   ForeignKeyAction,
   ForeignKeyConstraint,
@@ -59,7 +59,7 @@ export type MigrationPlan = {
   migration: MigrationDescriptor
   direction: MigrationDirection
   transaction: MigrationTransactionMode
-  statements: DataDefinitionOperation[]
+  statements: DataMigrationOperation[]
 }
 
 export type MigrationJournalRow = {
@@ -170,12 +170,12 @@ export interface AlterTableBuilder {
 export interface MigrationSchemaApi {
   createTable(
     name: string,
-    define: (table: CreateTableBuilder) => void,
+    migrate: (table: CreateTableBuilder) => void,
     options?: CreateTableOptions,
   ): Promise<void>
   alterTable(
     name: string,
-    define: (table: AlterTableBuilder) => void,
+    migrate: (table: AlterTableBuilder) => void,
     options?: AlterTableOptions,
   ): Promise<void>
   renameTable(from: string, to: string): Promise<void>
@@ -511,7 +511,7 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
 
 class AlterTableBuilderRuntime implements AlterTableBuilder {
   alterChanges: AlterTableChange[] = []
-  extraStatements: DataDefinitionOperation[] = []
+  extraStatements: DataMigrationOperation[] = []
   table: TableRef
 
   constructor(table: TableRef) {
@@ -627,12 +627,12 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 
 function createSchemaApi(
   db: Database,
-  emit: (operation: DataDefinitionOperation) => Promise<void>,
+  emit: (operation: DataMigrationOperation) => Promise<void>,
 ): MigrationSchemaApi {
   return {
-    async createTable(name, define, options) {
+    async createTable(name, migrate, options) {
       let builder = new CreateTableBuilderRuntime()
-      define(builder)
+      migrate(builder)
 
       await emit({
         kind: 'createTable',
@@ -656,10 +656,10 @@ function createSchemaApi(
         })
       }
     },
-    async alterTable(name, define, options) {
+    async alterTable(name, migrate, options) {
       let table = toTableRef(name)
       let builder = new AlterTableBuilderRuntime(table)
-      define(builder)
+      migrate(builder)
 
       if (builder.alterChanges.length > 0) {
         await emit({

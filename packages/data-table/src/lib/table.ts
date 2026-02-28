@@ -763,7 +763,7 @@ function normalizePrimaryKey(
   if (primaryKey === undefined) {
     if (!Object.prototype.hasOwnProperty.call(columns, 'id')) {
       throw new Error(
-        'Table "' + tableName + '" must define an "id" column or an explicit primaryKey',
+        'Table "' + tableName + '" must include an "id" column or an explicit primaryKey',
       )
     }
 

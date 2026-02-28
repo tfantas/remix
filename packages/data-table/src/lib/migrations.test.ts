@@ -5,7 +5,7 @@ import type {
   DataManipulationRequest,
   DataMigrationRequest,
   DataMigrationResult,
-  DataDefinitionOperation,
+  DataMigrationOperation,
   DataManipulationResult,
   DatabaseAdapter,
   TransactionToken,
@@ -33,18 +33,18 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   journalTableCreated = false
   journalTableName = 'data_table_migrations'
   journalRows: JournalRow[] = []
-  migratedOperations: DataDefinitionOperation[] = []
+  migratedOperations: DataMigrationOperation[] = []
   executedRawSql: SqlStatement[] = []
   lockAcquireCount = 0
   lockReleaseCount = 0
   beginTransactionCount = 0
   commitTransactionCount = 0
   rollbackTransactionCount = 0
-  failOnMigrateKind: DataDefinitionOperation['kind'] | undefined
+  failOnMigrateKind: DataMigrationOperation['kind'] | undefined
   #transactionCounter = 0
   #tokens = new Set<string>()
 
-  compileSql(operation: DataDefinitionOperation | DataManipulationRequest['operation']): SqlStatement[] {
+  compileSql(operation: DataMigrationOperation | DataManipulationRequest['operation']): SqlStatement[] {
     return [{ text: operation.kind, values: [] }]
   }
 
@@ -173,8 +173,8 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
 }
 
 describe('migration column builder', () => {
-  it('builds canonical definitions with chainable methods', () => {
-    let definition = column
+  it('builds canonical column specs with chainable methods', () => {
+    let columnSpec = column
       .varchar(255)
       .notNull()
       .default('hello')
@@ -189,7 +189,7 @@ describe('migration column builder', () => {
       .charset('utf8mb4')
       .build()
 
-    assert.deepEqual(definition, {
+    assert.deepEqual(columnSpec, {
       type: 'varchar',
       length: 255,
       nullable: false,

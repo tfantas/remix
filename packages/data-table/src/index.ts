@@ -23,7 +23,7 @@ export type {
   CreateIndexOperation,
   CreateTableOperation,
   DataMigrationResult,
-  DataDefinitionOperation,
+  DataMigrationOperation,
   DataManipulationResult,
   DataManipulationOperation,
   DeleteOperation,

@@ -416,7 +416,7 @@ export type DropCheckOperation = {
   name: string
 }
 
-export type DataDefinitionOperation =
+export type DataMigrationOperation =
   | CreateTableOperation
   | AlterTableOperation
   | RenameTableOperation
@@ -458,7 +458,7 @@ export type DataManipulationRequest = {
  * Adapter migration request payload.
  */
 export type DataMigrationRequest = {
-  operation: DataDefinitionOperation
+  operation: DataMigrationOperation
   transaction?: TransactionToken
 }
 
@@ -472,7 +472,7 @@ export type DataManipulationResult = {
 }
 
 /**
- * Adapter data-definition result payload.
+ * Adapter data-migration result payload.
  */
 export type DataMigrationResult = {
   affectedObjects?: number
@@ -495,7 +495,7 @@ export type AdapterCapabilities = {
 export type AdapterCapabilityOverrides = Pretty<Partial<AdapterCapabilities>>
 
 export interface SqlCompiler {
-  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[]
+  compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[]
 }
 
 /**
@@ -504,7 +504,7 @@ export interface SqlCompiler {
 export interface DatabaseAdapter {
   dialect: string
   capabilities: AdapterCapabilities
-  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[]
+  compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[]
   execute(request: DataManipulationRequest): Promise<DataManipulationResult>
   migrate(request: DataMigrationRequest): Promise<DataMigrationResult>
   beginTransaction(options?: TransactionOptions): Promise<TransactionToken>

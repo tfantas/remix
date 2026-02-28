@@ -3,7 +3,7 @@ import type {
   DataMigrationRequest,
   DataManipulationRequest,
   DataMigrationResult,
-  DataDefinitionOperation,
+  DataMigrationOperation,
   DataManipulationResult,
   DataManipulationOperation,
   DatabaseAdapter,
@@ -88,13 +88,13 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[] {
+  compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
       let compiled = compilePostgresStatement(operation)
       return [{ text: compiled.text, values: compiled.values }]
     }
 
-    return compilePostgresDefinitionStatements(operation)
+    return compilePostgresMigrationStatements(operation)
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
@@ -365,7 +365,7 @@ function isInsertStatement(
 }
 
 function isDataManipulationOperation(
-  operation: DataManipulationOperation | DataDefinitionOperation,
+  operation: DataManipulationOperation | DataMigrationOperation,
 ): operation is DataManipulationOperation {
   return (
     operation.kind === 'select' ||
@@ -380,7 +380,7 @@ function isDataManipulationOperation(
   )
 }
 
-function compilePostgresDefinitionStatements(operation: DataDefinitionOperation): SqlStatement[] {
+function compilePostgresMigrationStatements(operation: DataMigrationOperation): SqlStatement[] {
   if (operation.kind === 'raw') {
     return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }
@@ -693,7 +693,7 @@ function compilePostgresDefinitionStatements(operation: DataDefinitionOperation)
     ]
   }
 
-  throw new Error('Unsupported data definition statement kind')
+  throw new Error('Unsupported data migration operation kind')
 }
 
 function compilePostgresColumn(definition: ColumnDefinition): string {

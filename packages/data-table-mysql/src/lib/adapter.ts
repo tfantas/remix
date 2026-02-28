@@ -3,7 +3,7 @@ import type {
   DataManipulationRequest,
   DataMigrationRequest,
   DataMigrationResult,
-  DataDefinitionOperation,
+  DataMigrationOperation,
   DataManipulationResult,
   DataManipulationOperation,
   DatabaseAdapter,
@@ -90,13 +90,13 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[] {
+  compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
       let compiled = compileMysqlStatement(operation)
       return [{ text: compiled.text, values: compiled.values }]
     }
 
-    return compileMysqlDefinitionStatements(operation)
+    return compileMysqlMigrationStatements(operation)
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
@@ -387,7 +387,7 @@ function isInsertStatement(
 }
 
 function isDataManipulationOperation(
-  operation: DataManipulationOperation | DataDefinitionOperation,
+  operation: DataManipulationOperation | DataMigrationOperation,
 ): operation is DataManipulationOperation {
   return (
     operation.kind === 'select' ||
@@ -402,7 +402,7 @@ function isDataManipulationOperation(
   )
 }
 
-function compileMysqlDefinitionStatements(operation: DataDefinitionOperation): SqlStatement[] {
+function compileMysqlMigrationStatements(operation: DataMigrationOperation): SqlStatement[] {
   if (operation.kind === 'raw') {
     return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }
@@ -680,7 +680,7 @@ function compileMysqlDefinitionStatements(operation: DataDefinitionOperation): S
     ]
   }
 
-  throw new Error('Unsupported data definition statement kind')
+  throw new Error('Unsupported data migration operation kind')
 }
 
 function compileMysqlColumn(definition: ColumnDefinition): string {

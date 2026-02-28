@@ -3,7 +3,7 @@ import type {
   DataManipulationRequest,
   DataMigrationRequest,
   DataMigrationResult,
-  DataDefinitionOperation,
+  DataMigrationOperation,
   DataManipulationResult,
   DataManipulationOperation,
   DatabaseAdapter,
@@ -52,13 +52,13 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[] {
+  compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
       let compiled = compileSqliteStatement(operation)
       return [{ text: compiled.text, values: compiled.values }]
     }
 
-    return compileSqliteDefinitionStatements(operation)
+    return compileSqliteMigrationStatements(operation)
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
@@ -322,7 +322,7 @@ function isInsertStatement(
 }
 
 function isDataManipulationOperation(
-  operation: DataManipulationOperation | DataDefinitionOperation,
+  operation: DataManipulationOperation | DataMigrationOperation,
 ): operation is DataManipulationOperation {
   return (
     operation.kind === 'select' ||
@@ -337,7 +337,7 @@ function isDataManipulationOperation(
   )
 }
 
-function compileSqliteDefinitionStatements(operation: DataDefinitionOperation): SqlStatement[] {
+function compileSqliteMigrationStatements(operation: DataMigrationOperation): SqlStatement[] {
   if (operation.kind === 'raw') {
     return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }
@@ -614,7 +614,7 @@ function compileSqliteDefinitionStatements(operation: DataDefinitionOperation): 
     ]
   }
 
-  throw new Error('Unsupported data definition statement kind')
+  throw new Error('Unsupported data migration operation kind')
 }
 
 function compileSqliteColumn(definition: ColumnDefinition): string {

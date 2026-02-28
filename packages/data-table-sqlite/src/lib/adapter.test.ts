@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
 import Database from 'better-sqlite3'
-import type { DataDefinitionOperation } from '@remix-run/data-table'
+import type { DataMigrationOperation } from '@remix-run/data-table'
 import { createDatabase, createTable, eq } from '@remix-run/data-table'
 
 import { createSqliteDatabaseAdapter } from './adapter.ts'
@@ -397,7 +397,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
     }
 
     let adapter = createSqliteDatabaseAdapter(sqlite as never)
-    let operations: DataDefinitionOperation[] = [
+    let operations: DataMigrationOperation[] = [
       {
         kind: 'createTable',
         table: { schema: 'app', name: 'users' },

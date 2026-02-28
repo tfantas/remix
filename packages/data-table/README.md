@@ -7,7 +7,7 @@ Typed relational query toolkit for JavaScript runtimes.
 - **One API Across Databases**: Same query and relation APIs across PostgreSQL, MySQL, and SQLite adapters
 - **Two Complementary Query Styles**: Use the chainable query builder for advanced queries or high-level database helpers for common CRUD
 - **Type-Safe Reads**: Typed `select`, relation loading, and predicate keys
-- **Validated Writes and Filters**: Values are parsed with your `remix/data-schema` definitions
+- **Validated Writes and Filters**: Values are parsed with your `remix/data-schema` schemas
 - **Relation-First Queries**: `hasMany`, `hasOne`, `belongsTo`, `hasManyThrough`, and nested eager loading
 - **Safe Scoped Writes**: `update`/`delete` with `orderBy`/`limit` run safely in a transaction
 - **Raw SQL Escape Hatch**: Execute SQL directly with `db.exec(sql\`...\`)`
@@ -17,7 +17,7 @@ Typed relational query toolkit for JavaScript runtimes.
 - [**Query Builder**](#query-builder) for expressive joins, aggregates, eager loading, and scoped writes
 - [**CRUD Helpers**](#crud-helpers) for common create/read/update/delete flows (`find`, `create`, `update`, `delete`)
 
-Both APIs are type-safe and validate values using your [remix/data-schema](https://github.com/remix-run/remix/tree/main/packages/data-schema) definitions.
+Both APIs are type-safe and validate values using your [remix/data-schema](https://github.com/remix-run/remix/tree/main/packages/data-schema) schemas.
 
 ## Installation
 
@@ -401,7 +401,7 @@ await db.exec(rawSql('update users set role = ? where id = ?', ['admin', 'u_001'
 
 ## Related Packages
 
-- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema definitions and parsing used by `data-table`
+- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema parsing and validation used by `data-table`
 - [`data-table-postgres`](https://github.com/remix-run/remix/tree/main/packages/data-table-postgres) - PostgreSQL adapter
 - [`data-table-mysql`](https://github.com/remix-run/remix/tree/main/packages/data-table-mysql) - MySQL adapter
 - [`data-table-sqlite`](https://github.com/remix-run/remix/tree/main/packages/data-table-sqlite) - SQLite adapter

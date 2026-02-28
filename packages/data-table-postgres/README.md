@@ -7,7 +7,7 @@ Use this package when you want `data-table` APIs backed by `pg`.
 
 - **Native `pg` Integration**: Works with `Pool` and Postgres connection strings
 - **Full `data-table` API Support**: Queries, relations, writes, and transactions
-- **Migration DDL Support**: Compiles and executes `DataDefinitionOperation` operations for `remix/data-table/migrations`
+- **Migration DDL Support**: Compiles and executes `DataMigrationOperation` operations for `remix/data-table/migrations`
 - **Postgres Capabilities Enabled By Default**:
   - `returning: true`
   - `savepoints: true`
@@ -77,7 +77,7 @@ let adapter = createPostgresDatabaseAdapter(pool, {
 ## Related Packages
 
 - [`data-table`](https://github.com/remix-run/remix/tree/main/packages/data-table) - Core query/relations API
-- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema definitions and validation
+- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema parsing and validation
 - [`data-table-mysql`](https://github.com/remix-run/remix/tree/main/packages/data-table-mysql) - MySQL adapter
 - [`data-table-sqlite`](https://github.com/remix-run/remix/tree/main/packages/data-table-sqlite) - SQLite adapter
 

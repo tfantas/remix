@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
-import type { DataDefinitionOperation } from '@remix-run/data-table'
+import type { DataMigrationOperation } from '@remix-run/data-table'
 import { createDatabase, createTable, eq, inList, sql } from '@remix-run/data-table'
 
 import { createPostgresDatabaseAdapter } from './adapter.ts'
@@ -617,7 +617,7 @@ describe('postgres adapter', () => {
     assert.deepEqual(statements[4].values, ['data_table_migrations'])
   })
 
-  it('compiles rich createTable definitions including literals, references, and comments', () => {
+  it('compiles rich createTable migrations including literals, references, and comments', () => {
     let adapter = createPostgresDatabaseAdapter({
       async query() {
         return {
@@ -853,7 +853,7 @@ describe('postgres adapter', () => {
 
     assert.throws(
       () => adapter.compileSql({ kind: 'unknown' } as never),
-      /Unsupported data definition statement kind/,
+      /Unsupported data migration operation kind/,
     )
     assert.throws(
       () =>
@@ -887,7 +887,7 @@ describe('postgres adapter', () => {
       },
     } as never)
 
-    let operations: DataDefinitionOperation[] = [
+    let operations: DataMigrationOperation[] = [
       {
         kind: 'createTable',
         table: { schema: 'app', name: 'users' },
