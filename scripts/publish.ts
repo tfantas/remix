@@ -22,7 +22,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { tagExists } from './utils/git.ts'
-import { createRelease } from './utils/github.ts'
+import { createRelease, releaseExists } from './utils/github.ts'
 import { getRootDir, logAndExec } from './utils/process.ts'
 import { readChangesConfig, getChangelogEntry } from './utils/changes.ts'
 import {
@@ -152,7 +152,7 @@ async function getUnpublishedPackages(): Promise<PublishedPackage[]> {
 }
 
 /**
- * Find package versions that are already published to npm but missing local git tags.
+ * Find package versions that are already published to npm but missing git tags.
  * This enables release recovery after partial publish failures.
  */
 async function getPublishedPackagesMissingTags(): Promise<PublishedPackage[]> {
@@ -182,6 +182,43 @@ async function getPublishedPackagesMissingTags(): Promise<PublishedPackage[]> {
   }
 
   return missingTags
+}
+
+/**
+ * Find package versions that are already published and tagged but missing GitHub releases.
+ * This enables release recovery after tags were pushed successfully.
+ */
+async function getPublishedPackagesMissingReleases(): Promise<PublishedPackage[]> {
+  let localPackages = getLocalPackages()
+
+  let npmResults = await Promise.all(
+    localPackages.map(async (pkg) => ({
+      pkg,
+      isPublished: await isVersionPublished(pkg.npmName, pkg.localVersion),
+    })),
+  )
+
+  let missingReleases: PublishedPackage[] = []
+  for (let { pkg, isPublished } of npmResults) {
+    if (!isPublished) {
+      continue
+    }
+
+    let tag = getGitTag(pkg.npmName, pkg.localVersion)
+    if (!tagExists(tag)) {
+      continue
+    }
+
+    if (!(await releaseExists(tag))) {
+      missingReleases.push({
+        packageName: pkg.npmName,
+        version: pkg.localVersion,
+        tag,
+      })
+    }
+  }
+
+  return missingReleases
 }
 
 function dedupePublishedPackages(packages: PublishedPackage[]): PublishedPackage[] {
@@ -368,6 +405,7 @@ async function main() {
   let packagesNeedingTagsOrReleases = dedupePublishedPackages([
     ...published,
     ...(await getPublishedPackagesMissingTags()),
+    ...(await getPublishedPackagesMissingReleases()),
   ])
 
   if (packagesNeedingTagsOrReleases.length === 0) {
