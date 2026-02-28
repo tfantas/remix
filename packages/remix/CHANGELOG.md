@@ -8,33 +8,18 @@ This is the changelog for [`remix`](https://github.com/remix-run/remix/tree/main
 
 - Added `package.json` `exports`:
 
-  - `remix/fetch-router/routes` to re-export APIs from `@remix-run/fetch-router/routes`
-
-- Added `package.json` `exports`:
-
   - `remix/data-schema` to re-export APIs from `@remix-run/data-schema`
   - `remix/data-schema/checks` to re-export APIs from `@remix-run/data-schema/checks`
   - `remix/data-schema/coerce` to re-export APIs from `@remix-run/data-schema/coerce`
   - `remix/data-schema/lazy` to re-export APIs from `@remix-run/data-schema/lazy`
-
-- Added `package.json` `exports`:
-
   - `remix/data-table` to re-export APIs from `@remix-run/data-table`
   - `remix/data-table-mysql` to re-export APIs from `@remix-run/data-table-mysql`
   - `remix/data-table-postgres` to re-export APIs from `@remix-run/data-table-postgres`
   - `remix/data-table-sqlite` to re-export APIs from `@remix-run/data-table-sqlite`
-
-- Added `package.json` `exports`:
-
-  - `remix/session-storage-memcache` to re-export APIs from `@remix-run/session-storage-memcache`
-
-- Added `package.json` `exports`:
-
-  - `remix/session-storage-redis` to re-export APIs from `@remix-run/session-storage-redis`
-
-- Added `package.json` `exports`:
-
+  - `remix/fetch-router/routes` to re-export APIs from `@remix-run/fetch-router/routes`
   - `remix/file-storage-s3` to re-export APIs from `@remix-run/file-storage-s3`
+  - `remix/session-storage-memcache` to re-export APIs from `@remix-run/session-storage-memcache`
+  - `remix/session-storage-redis` to re-export APIs from `@remix-run/session-storage-redis`
 
 - Remove the root export from the `remix` package so you will no longer import anything from `remix` and will instead always import from a sub-path such as `remix/fetch-router` or `remix/component`
 
