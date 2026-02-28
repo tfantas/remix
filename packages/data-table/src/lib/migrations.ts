@@ -85,7 +85,6 @@ export type MigrateOptions = {
   to?: string
   step?: number
   dryRun?: boolean
-  planOnly?: boolean
 }
 
 export type MigrateResult = {
@@ -1050,7 +1049,7 @@ function assertNoMigrationDrift(
 }
 
 function createDryRunDatabase(adapter: DatabaseAdapter): Database {
-  let error = new Error('Cannot execute data operations while running migrations with dryRun/planOnly')
+  let error = new Error('Cannot execute data operations while running migrations with dryRun')
   let dryRunAdapter: DatabaseAdapter = {
     dialect: adapter.dialect,
     capabilities: adapter.capabilities,
@@ -1090,7 +1089,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
   let adapter = input.adapter
   let migrations = input.migrations
   let tableName = input.tableName
-  let dryRun = Boolean(input.options.dryRun || input.options.planOnly)
+  let dryRun = Boolean(input.options.dryRun)
   let target = input.options.to
   let step = input.options.step
 
