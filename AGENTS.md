@@ -48,6 +48,7 @@
 
 - **Adding changes**: Create `packages/*/.changes/[major|minor|patch].short-description.md` files. See [CONTRIBUTING.md](./CONTRIBUTING.md#adding-a-change-file) for details.
 - **Remix package changes are generated in CI**: In new PRs, do not manually edit `packages/remix/*` and do not add `packages/remix/.changes/*` files.
+- **Remix package code updates are generated in CI**: When making code changes in other packages, do not manually update `packages/remix/*`; CI runs the `generate-remix` script to apply those updates automatically.
 - **Updating changes**: If iterating on an unpublished change with a change file, update it in place rather than creating a new one.
 - **Versioning**: Follow semver, but ensure you follow 0.x conventions where breaking changes can happen in minor releases:
   - For **brand-new packages**: Start at version `0.0.0`. The first release should use a `minor` change file so it bumps to `0.1.0`.

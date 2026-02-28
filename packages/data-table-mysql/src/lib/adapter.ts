@@ -1,8 +1,8 @@
 import type {
   AdapterCapabilityOverrides,
-  AdapterExecuteRequest,
-  AdapterMigrateRequest,
-  DataDefinitionResult,
+  DataManipulationRequest,
+  DataMigrationRequest,
+  DataMigrationResult,
   DataDefinitionOperation,
   DataManipulationResult,
   DataManipulationOperation,
@@ -99,7 +99,7 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     return compileMysqlDefinitionStatements(operation)
   }
 
-  async execute(request: AdapterExecuteRequest): Promise<DataManipulationResult> {
+  async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
     if (request.operation.kind === 'insertMany' && request.operation.values.length === 0) {
       return {
         affectedRows: 0,
@@ -131,7 +131,7 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  async migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult> {
+  async migrate(request: DataMigrationRequest): Promise<DataMigrationResult> {
     let statements = this.compileSql(request.operation)
     let client = this.#resolveClient(request.transaction)
 
@@ -324,8 +324,8 @@ function normalizeCountRows(rows: Record<string, unknown>[]): Record<string, unk
 }
 
 function normalizeInsertId(
-  kind: AdapterExecuteRequest['operation']['kind'],
-  statement: AdapterExecuteRequest['operation'],
+  kind: DataManipulationRequest['operation']['kind'],
+  statement: DataManipulationRequest['operation'],
   header: MysqlQueryResultHeader,
 ): unknown {
   if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
@@ -371,14 +371,14 @@ function quoteLiteral(value: unknown): string {
   return '\'' + String(value).replace(/'/g, "''") + '\''
 }
 
-function isInsertStatementKind(kind: AdapterExecuteRequest['operation']['kind']): boolean {
+function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
 function isInsertStatement(
-  statement: AdapterExecuteRequest['operation'],
+  statement: DataManipulationRequest['operation'],
 ): statement is Extract<
-  AdapterExecuteRequest['operation'],
+  DataManipulationRequest['operation'],
   { kind: 'insert' | 'insertMany' | 'upsert' }
 > {
   return (

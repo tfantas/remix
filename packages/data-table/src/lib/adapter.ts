@@ -449,7 +449,7 @@ export type TransactionOptions = {
 /**
  * Adapter execution request payload.
  */
-export type AdapterExecuteRequest = {
+export type DataManipulationRequest = {
   operation: DataManipulationOperation
   transaction?: TransactionToken
 }
@@ -457,7 +457,7 @@ export type AdapterExecuteRequest = {
 /**
  * Adapter migration request payload.
  */
-export type AdapterMigrateRequest = {
+export type DataMigrationRequest = {
   operation: DataDefinitionOperation
   transaction?: TransactionToken
 }
@@ -474,7 +474,7 @@ export type DataManipulationResult = {
 /**
  * Adapter data-definition result payload.
  */
-export type DataDefinitionResult = {
+export type DataMigrationResult = {
   affectedObjects?: number
 }
 
@@ -505,8 +505,8 @@ export interface DatabaseAdapter {
   dialect: string
   capabilities: AdapterCapabilities
   compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[]
-  execute(request: AdapterExecuteRequest): Promise<DataManipulationResult>
-  migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult>
+  execute(request: DataManipulationRequest): Promise<DataManipulationResult>
+  migrate(request: DataMigrationRequest): Promise<DataMigrationResult>
   beginTransaction(options?: TransactionOptions): Promise<TransactionToken>
   commitTransaction(token: TransactionToken): Promise<void>
   rollbackTransaction(token: TransactionToken): Promise<void>

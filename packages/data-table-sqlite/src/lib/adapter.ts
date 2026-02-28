@@ -1,8 +1,8 @@
 import type {
   AdapterCapabilityOverrides,
-  AdapterExecuteRequest,
-  AdapterMigrateRequest,
-  DataDefinitionResult,
+  DataManipulationRequest,
+  DataMigrationRequest,
+  DataMigrationResult,
   DataDefinitionOperation,
   DataManipulationResult,
   DataManipulationOperation,
@@ -61,7 +61,7 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     return compileSqliteDefinitionStatements(operation)
   }
 
-  async execute(request: AdapterExecuteRequest): Promise<DataManipulationResult> {
+  async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
     if (request.operation.kind === 'insertMany' && request.operation.values.length === 0) {
       return {
         affectedRows: 0,
@@ -95,7 +95,7 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  async migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult> {
+  async migrate(request: DataMigrationRequest): Promise<DataMigrationResult> {
     let statements = this.compileSql(request.operation)
 
     for (let statement of statements) {
@@ -206,7 +206,7 @@ function normalizeCountRows(rows: Record<string, unknown>[]): Record<string, unk
 }
 
 function normalizeAffectedRowsForReader(
-  kind: AdapterExecuteRequest['operation']['kind'],
+  kind: DataManipulationRequest['operation']['kind'],
   rows: Record<string, unknown>[],
 ): number | undefined {
   if (isWriteStatementKind(kind)) {
@@ -217,8 +217,8 @@ function normalizeAffectedRowsForReader(
 }
 
 function normalizeInsertIdForReader(
-  kind: AdapterExecuteRequest['operation']['kind'],
-  statement: AdapterExecuteRequest['operation'],
+  kind: DataManipulationRequest['operation']['kind'],
+  statement: DataManipulationRequest['operation'],
   rows: Record<string, unknown>[],
 ): unknown {
   if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
@@ -238,7 +238,7 @@ function normalizeInsertIdForReader(
 }
 
 function normalizeAffectedRowsForRun(
-  kind: AdapterExecuteRequest['operation']['kind'],
+  kind: DataManipulationRequest['operation']['kind'],
   result: RunResult,
 ): number | undefined {
   if (kind === 'select' || kind === 'count' || kind === 'exists') {
@@ -249,8 +249,8 @@ function normalizeAffectedRowsForRun(
 }
 
 function normalizeInsertIdForRun(
-  kind: AdapterExecuteRequest['operation']['kind'],
-  statement: AdapterExecuteRequest['operation'],
+  kind: DataManipulationRequest['operation']['kind'],
+  statement: DataManipulationRequest['operation'],
   result: RunResult,
 ): unknown {
   if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
@@ -296,7 +296,7 @@ function quoteLiteral(value: unknown): string {
   return '\'' + String(value).replace(/'/g, "''") + '\''
 }
 
-function isWriteStatementKind(kind: AdapterExecuteRequest['operation']['kind']): boolean {
+function isWriteStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return (
     kind === 'insert' ||
     kind === 'insertMany' ||
@@ -306,14 +306,14 @@ function isWriteStatementKind(kind: AdapterExecuteRequest['operation']['kind']):
   )
 }
 
-function isInsertStatementKind(kind: AdapterExecuteRequest['operation']['kind']): boolean {
+function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
 function isInsertStatement(
-  statement: AdapterExecuteRequest['operation'],
+  statement: DataManipulationRequest['operation'],
 ): statement is Extract<
-  AdapterExecuteRequest['operation'],
+  DataManipulationRequest['operation'],
   { kind: 'insert' | 'insertMany' | 'upsert' }
 > {
   return (

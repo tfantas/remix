@@ -1,8 +1,8 @@
 import type {
   AdapterCapabilityOverrides,
-  AdapterMigrateRequest,
-  AdapterExecuteRequest,
-  DataDefinitionResult,
+  DataMigrationRequest,
+  DataManipulationRequest,
+  DataMigrationResult,
   DataDefinitionOperation,
   DataManipulationResult,
   DataManipulationOperation,
@@ -97,7 +97,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     return compilePostgresDefinitionStatements(operation)
   }
 
-  async execute(request: AdapterExecuteRequest): Promise<DataManipulationResult> {
+  async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
     if (request.operation.kind === 'insertMany' && request.operation.values.length === 0) {
       return {
         affectedRows: 0,
@@ -122,7 +122,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  async migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult> {
+  async migrate(request: DataMigrationRequest): Promise<DataMigrationResult> {
     let statements = this.compileSql(request.operation)
     let client = this.#resolveClient(request.transaction)
 
@@ -305,7 +305,7 @@ function normalizeCountRows(rows: Record<string, unknown>[]): Record<string, unk
 }
 
 function normalizeAffectedRows(
-  kind: AdapterExecuteRequest['operation']['kind'],
+  kind: DataManipulationRequest['operation']['kind'],
   rowCount: number | null,
   rows: Record<string, unknown>[],
 ): number | undefined {
@@ -325,8 +325,8 @@ function normalizeAffectedRows(
 }
 
 function normalizeInsertId(
-  kind: AdapterExecuteRequest['operation']['kind'],
-  statement: AdapterExecuteRequest['operation'],
+  kind: DataManipulationRequest['operation']['kind'],
+  statement: DataManipulationRequest['operation'],
   rows: Record<string, unknown>[],
 ): unknown {
   if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
@@ -349,14 +349,14 @@ function quoteIdentifier(value: string): string {
   return '"' + value.replace(/"/g, '""') + '"'
 }
 
-function isInsertStatementKind(kind: AdapterExecuteRequest['operation']['kind']): boolean {
+function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
 function isInsertStatement(
-  statement: AdapterExecuteRequest['operation'],
+  statement: DataManipulationRequest['operation'],
 ): statement is Extract<
-  AdapterExecuteRequest['operation'],
+  DataManipulationRequest['operation'],
   { kind: 'insert' | 'insertMany' | 'upsert' }
 > {
   return (

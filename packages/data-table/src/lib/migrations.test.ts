@@ -2,9 +2,9 @@ import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { rawSql } from './sql.ts'
 import type {
-  AdapterExecuteRequest,
-  AdapterMigrateRequest,
-  DataDefinitionResult,
+  DataManipulationRequest,
+  DataMigrationRequest,
+  DataMigrationResult,
   DataDefinitionOperation,
   DataManipulationResult,
   DatabaseAdapter,
@@ -44,11 +44,11 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   #transactionCounter = 0
   #tokens = new Set<string>()
 
-  compileSql(operation: DataDefinitionOperation | AdapterExecuteRequest['operation']): SqlStatement[] {
+  compileSql(operation: DataDefinitionOperation | DataManipulationRequest['operation']): SqlStatement[] {
     return [{ text: operation.kind, values: [] }]
   }
 
-  async execute(request: AdapterExecuteRequest): Promise<DataManipulationResult> {
+  async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
     if (request.operation.kind !== 'raw') {
       throw new Error('MemoryMigrationAdapter only supports raw execute operations')
     }
@@ -105,7 +105,7 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
     return { affectedRows: 0 }
   }
 
-  async migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult> {
+  async migrate(request: DataMigrationRequest): Promise<DataMigrationResult> {
     let operation = request.operation
 
     if (
