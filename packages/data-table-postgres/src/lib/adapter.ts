@@ -19,7 +19,7 @@ import {
   isDataManipulationOperation as isDataManipulationOperationHelper,
   quoteLiteral as quoteLiteralHelper,
   quoteTableRef as quoteTableRefHelper,
-} from '@remix-run/data-table/internal/sql-helpers'
+} from '@remix-run/data-table/sql-helpers'
 
 import { compilePostgresStatement } from './sql-compiler.ts'
 

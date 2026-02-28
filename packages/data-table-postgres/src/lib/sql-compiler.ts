@@ -4,7 +4,7 @@ import {
   collectColumns as collectColumnsHelper,
   normalizeJoinType as normalizeJoinTypeHelper,
   quotePath as quotePathHelper,
-} from '@remix-run/data-table/internal/sql-helpers'
+} from '@remix-run/data-table/sql-helpers'
 
 type JoinClause = Extract<DataManipulationOperation, { kind: 'select' }>['joins'][number]
 type UpsertOperation = Extract<DataManipulationOperation, { kind: 'upsert' }>

@@ -19,7 +19,7 @@ import {
   isDataManipulationOperation as isDataManipulationOperationHelper,
   quoteLiteral as quoteLiteralHelper,
   quoteTableRef as quoteTableRefHelper,
-} from '@remix-run/data-table/internal/sql-helpers'
+} from '@remix-run/data-table/sql-helpers'
 import type { Database as BetterSqliteDatabase, RunResult } from 'better-sqlite3'
 
 import { compileSqliteStatement } from './sql-compiler.ts'

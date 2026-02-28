@@ -1,3 +1,4 @@
+export type { QuoteIdentifier } from './lib/sql-helpers.ts'
 export {
   collectColumns,
   defaultIndexName,
@@ -6,4 +7,4 @@ export {
   quoteLiteral,
   quotePath,
   quoteTableRef,
-} from '../lib/sql-helpers.ts'
+} from './lib/sql-helpers.ts'
