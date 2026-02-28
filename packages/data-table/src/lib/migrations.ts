@@ -146,7 +146,7 @@ export interface AlterTableBuilder {
   renameColumn(from: string, to: string): void
   dropColumn(name: string, options?: { ifExists?: boolean }): void
   addPrimaryKey(columns: string[], options?: { name?: string }): void
-  dropPrimaryKey(options?: { name?: string }): void
+  dropPrimaryKey(name?: string): void
   addUnique(columns: string[], options?: { name?: string }): void
   dropUnique(name: string): void
   addForeignKey(
@@ -545,8 +545,8 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     })
   }
 
-  dropPrimaryKey(options?: { name?: string }): void {
-    this.alterChanges.push({ kind: 'dropPrimaryKey', name: options?.name })
+  dropPrimaryKey(name?: string): void {
+    this.alterChanges.push({ kind: 'dropPrimaryKey', name })
   }
 
   addUnique(columns: string[], options?: { name?: string }): void {
