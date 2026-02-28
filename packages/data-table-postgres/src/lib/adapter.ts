@@ -16,9 +16,10 @@ import {
   compileDataManipulationOperation,
   compileOperationToSql,
 } from '@remix-run/data-table/internal/sql-compiler'
+import { postgresSqlDialect } from './sql-dialect.ts'
 
 let postgresSqlCompilerOptions = {
-  dialect: 'postgres',
+  dialect: postgresSqlDialect,
 } as const
 
 type Pretty<value> = {

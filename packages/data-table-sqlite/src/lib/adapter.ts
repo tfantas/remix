@@ -17,9 +17,10 @@ import {
   compileOperationToSql,
 } from '@remix-run/data-table/internal/sql-compiler'
 import type { Database as BetterSqliteDatabase, RunResult } from 'better-sqlite3'
+import { sqliteSqlDialect } from './sql-dialect.ts'
 
 let sqliteSqlCompilerOptions = {
-  dialect: 'sqlite',
+  dialect: sqliteSqlDialect,
   rewriteMigrationOperation: rewriteSqliteMigrationOperation,
 } as const
 

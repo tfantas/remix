@@ -16,9 +16,10 @@ import {
   compileDataManipulationOperation,
   compileOperationToSql,
 } from '@remix-run/data-table/internal/sql-compiler'
+import { mysqlSqlDialect } from './sql-dialect.ts'
 
 let mysqlSqlCompilerOptions = {
-  dialect: 'mysql',
+  dialect: mysqlSqlDialect,
 } as const
 
 /**
