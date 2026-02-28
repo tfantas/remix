@@ -131,7 +131,7 @@ export interface CreateTableBuilder {
     refColumns?: string[],
     options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
-  addCheck(expression: string, options?: { name?: string }): void
+  addCheck(name: string, expression: string): void
   addIndex(
     name: string,
     columns: IndexColumns,
@@ -156,7 +156,7 @@ export interface AlterTableBuilder {
     options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
   dropForeignKey(name: string): void
-  addCheck(expression: string, options?: { name?: string }): void
+  addCheck(name: string, expression: string): void
   dropCheck(name: string): void
   addIndex(
     name: string,
@@ -195,7 +195,7 @@ export interface MigrationSchemaApi {
     options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): Promise<void>
   dropForeignKey(table: string, name: string): Promise<void>
-  addCheck(table: string, expression: string, options?: { name?: string }): Promise<void>
+  addCheck(table: string, name: string, expression: string): Promise<void>
   dropCheck(table: string, name: string): Promise<void>
   raw(sql: string): Promise<void>
   tableExists(name: string): Promise<boolean>
@@ -488,8 +488,8 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
     })
   }
 
-  addCheck(expression: string, options?: { name?: string }): void {
-    this.checks.push({ expression, name: options?.name })
+  addCheck(name: string, expression: string): void {
+    this.checks.push({ expression, name })
   }
 
   addIndex(
@@ -585,10 +585,10 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropForeignKey', name })
   }
 
-  addCheck(expression: string, options?: { name?: string }): void {
+  addCheck(name: string, expression: string): void {
     this.alterChanges.push({
       kind: 'addCheck',
-      constraint: { expression, name: options?.name },
+      constraint: { expression, name },
     })
   }
 
@@ -734,13 +734,13 @@ function createSchemaApi(
         name,
       })
     },
-    async addCheck(table, expression, options) {
+    async addCheck(table, name, expression) {
       await emit({
         kind: 'addCheck',
         table: toTableRef(table),
         constraint: {
           expression,
-          name: options?.name,
+          name,
         },
       })
     },

@@ -229,7 +229,7 @@ describe('migration runner', () => {
 
         await schema.alterTable('app.users', (table) => {
           table.addColumn('status', column.text().default('active'))
-          table.addCheck("status in ('active', 'disabled')", { name: 'users_status_check' })
+          table.addCheck('users_status_check', "status in ('active', 'disabled')")
           table.addIndex('users_status_idx', 'status')
         })
 
