@@ -770,10 +770,10 @@ class DatabaseRuntime implements Database {
     }
   }
 
-  async [executeStatement](statement: DataManipulationOperation): Promise<DataManipulationResult> {
+  async [executeStatement](operation: DataManipulationOperation): Promise<DataManipulationResult> {
     try {
       return await this.#adapter.execute({
-        operation: statement,
+        operation,
         transaction: this.#token,
       })
     } catch (error) {
@@ -781,7 +781,7 @@ class DatabaseRuntime implements Database {
         cause: error,
         metadata: {
           dialect: this.#adapter.dialect,
-          statementKind: statement.kind,
+          statementKind: operation.kind,
         },
       })
     }
@@ -1081,8 +1081,8 @@ export class QueryBuilder<
    * @returns All matching rows with requested eager-loaded relations.
    */
   async all(): Promise<Array<row & loaded>> {
-    let statement = this.#toSelectStatement()
-    let result = await this.#database[executeStatement](statement)
+    let operation = this.#toSelectStatement()
+    let result = await this.#database[executeStatement](operation)
     let rows = normalizeRows(result.rows)
 
     if (Object.keys(this.#state.with).length === 0) {
@@ -1122,7 +1122,7 @@ export class QueryBuilder<
    * @returns Number of rows that match the current query scope.
    */
   async count(): Promise<number> {
-    let statement: CountOperation<AnyTable> = {
+    let operation: CountOperation<AnyTable> = {
       kind: 'count',
       table: this.#table,
       joins: [...this.#state.joins],
@@ -1131,7 +1131,7 @@ export class QueryBuilder<
       having: [...this.#state.having],
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
 
     if (result.rows && result.rows[0] && typeof result.rows[0].count === 'number') {
       return result.rows[0].count as number
@@ -1149,7 +1149,7 @@ export class QueryBuilder<
    * @returns `true` when at least one row matches the current query scope.
    */
   async exists(): Promise<boolean> {
-    let statement: ExistsOperation<AnyTable> = {
+    let operation: ExistsOperation<AnyTable> = {
       kind: 'exists',
       table: this.#table,
       joins: [...this.#state.joins],
@@ -1158,7 +1158,7 @@ export class QueryBuilder<
       having: [...this.#state.having],
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
 
     if (result.rows && result.rows[0] && typeof result.rows[0].exists === 'boolean') {
       return result.rows[0].exists as boolean
@@ -1201,14 +1201,14 @@ export class QueryBuilder<
     assertReturningCapability(this.#database.adapter, 'insert', returning)
 
     if (returning) {
-      let statement: InsertOperation<AnyTable> = {
+      let operation: InsertOperation<AnyTable> = {
         kind: 'insert',
         table: this.#table,
         values: preparedValues,
         returning: normalizeReturningSelection(returning),
       }
 
-      let result = await this.#database[executeStatement](statement)
+      let result = await this.#database[executeStatement](operation)
       let row = (normalizeRows(result.rows)[0] ?? null) as row | null
 
       return {
@@ -1218,13 +1218,13 @@ export class QueryBuilder<
       }
     }
 
-    let statement: InsertOperation<AnyTable> = {
+    let operation: InsertOperation<AnyTable> = {
       kind: 'insert',
       table: this.#table,
       values: preparedValues,
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
     let metadata: WriteResult = {
       affectedRows: result.affectedRows ?? 0,
       insertId: result.insertId,
@@ -1270,14 +1270,14 @@ export class QueryBuilder<
     assertReturningCapability(this.#database.adapter, 'insertMany', returning)
 
     if (returning) {
-      let statement: InsertManyOperation<AnyTable> = {
+      let operation: InsertManyOperation<AnyTable> = {
         kind: 'insertMany',
         table: this.#table,
         values: preparedValues,
         returning: normalizeReturningSelection(returning),
       }
 
-      let result = await this.#database[executeStatement](statement)
+      let result = await this.#database[executeStatement](operation)
 
       return {
         affectedRows: result.affectedRows ?? 0,
@@ -1286,13 +1286,13 @@ export class QueryBuilder<
       }
     }
 
-    let statement: InsertManyOperation<AnyTable> = {
+    let operation: InsertManyOperation<AnyTable> = {
       kind: 'insertMany',
       table: this.#table,
       values: preparedValues,
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
     let metadata: WriteResult = {
       affectedRows: result.affectedRows ?? 0,
       insertId: result.insertId,
@@ -1360,7 +1360,7 @@ export class QueryBuilder<
       })
     }
 
-    let statement: UpdateOperation<AnyTable> = {
+    let operation: UpdateOperation<AnyTable> = {
       kind: 'update',
       table: this.#table,
       changes: preparedChanges,
@@ -1368,7 +1368,7 @@ export class QueryBuilder<
       returning: returning ? normalizeReturningSelection(returning) : undefined,
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
 
     if (!returning) {
       return {
@@ -1430,14 +1430,14 @@ export class QueryBuilder<
       })
     }
 
-    let statement: DeleteOperation<AnyTable> = {
+    let operation: DeleteOperation<AnyTable> = {
       kind: 'delete',
       table: this.#table,
       where: [...this.#state.where],
       returning: returning ? normalizeReturningSelection(returning) : undefined,
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
 
     if (!returning) {
       return {
@@ -1501,7 +1501,7 @@ export class QueryBuilder<
     assertReturningCapability(this.#database.adapter, 'upsert', returning)
 
     if (returning) {
-      let statement: UpsertOperation<AnyTable> = {
+      let operation: UpsertOperation<AnyTable> = {
         kind: 'upsert',
         table: this.#table,
         values: preparedValues,
@@ -1510,7 +1510,7 @@ export class QueryBuilder<
         returning: normalizeReturningSelection(returning),
       }
 
-      let result = await this.#database[executeStatement](statement)
+      let result = await this.#database[executeStatement](operation)
       let row = (normalizeRows(result.rows)[0] ?? null) as row | null
 
       return {
@@ -1520,7 +1520,7 @@ export class QueryBuilder<
       }
     }
 
-    let statement: UpsertOperation<AnyTable> = {
+    let operation: UpsertOperation<AnyTable> = {
       kind: 'upsert',
       table: this.#table,
       values: preparedValues,
@@ -1528,7 +1528,7 @@ export class QueryBuilder<
       update: updateChanges,
     }
 
-    let result = await this.#database[executeStatement](statement)
+    let result = await this.#database[executeStatement](operation)
     let metadata: WriteResult = {
       affectedRows: result.affectedRows ?? 0,
       insertId: result.insertId,

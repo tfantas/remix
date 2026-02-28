@@ -627,7 +627,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 
 function createSchemaApi(
   db: Database,
-  emit: (statement: DataDefinitionOperation) => Promise<void>,
+  emit: (operation: DataDefinitionOperation) => Promise<void>,
 ): MigrationSchemaApi {
   return {
     async createTable(name, define, options) {
@@ -670,8 +670,8 @@ function createSchemaApi(
         })
       }
 
-      for (let statement of builder.extraStatements) {
-        await emit(statement)
+      for (let operation of builder.extraStatements) {
+        await emit(operation)
       }
     },
     async renameTable(from, to) {
@@ -1177,12 +1177,12 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
         token = await adapter.beginTransaction()
       }
 
-      let schema = createSchemaApi(db, async (statement) => {
-        let compiled = adapter.compileSql(statement)
+      let schema = createSchemaApi(db, async (operation) => {
+        let compiled = adapter.compileSql(operation)
         sql.push(...compiled)
 
         if (!dryRun) {
-          await adapter.migrate({ operation: statement, transaction: token })
+          await adapter.migrate({ operation, transaction: token })
         }
       })
 

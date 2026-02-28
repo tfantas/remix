@@ -325,14 +325,14 @@ function normalizeCountRows(rows: Record<string, unknown>[]): Record<string, unk
 
 function normalizeInsertId(
   kind: DataManipulationRequest['operation']['kind'],
-  statement: DataManipulationRequest['operation'],
+  operation: DataManipulationRequest['operation'],
   header: MysqlQueryResultHeader,
 ): unknown {
-  if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
+  if (!isInsertStatementKind(kind) || !isInsertStatement(operation)) {
     return undefined
   }
 
-  if (getTablePrimaryKey(statement.table).length !== 1) {
+  if (getTablePrimaryKey(operation.table).length !== 1) {
     return undefined
   }
 
@@ -376,13 +376,13 @@ function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind'
 }
 
 function isInsertStatement(
-  statement: DataManipulationRequest['operation'],
-): statement is Extract<
+  operation: DataManipulationRequest['operation'],
+): operation is Extract<
   DataManipulationRequest['operation'],
   { kind: 'insert' | 'insertMany' | 'upsert' }
 > {
   return (
-    statement.kind === 'insert' || statement.kind === 'insertMany' || statement.kind === 'upsert'
+    operation.kind === 'insert' || operation.kind === 'insertMany' || operation.kind === 'upsert'
   )
 }
 
@@ -402,26 +402,26 @@ function isDataManipulationOperation(
   )
 }
 
-function compileMysqlDefinitionStatements(statement: DataDefinitionOperation): SqlStatement[] {
-  if (statement.kind === 'raw') {
-    return [{ text: statement.sql.text, values: [...statement.sql.values] }]
+function compileMysqlDefinitionStatements(operation: DataDefinitionOperation): SqlStatement[] {
+  if (operation.kind === 'raw') {
+    return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }
 
-  if (statement.kind === 'createTable') {
-    let columns = Object.keys(statement.columns).map(
-      (columnName) => quoteIdentifier(columnName) + ' ' + compileMysqlColumn(statement.columns[columnName]),
+  if (operation.kind === 'createTable') {
+    let columns = Object.keys(operation.columns).map(
+      (columnName) => quoteIdentifier(columnName) + ' ' + compileMysqlColumn(operation.columns[columnName]),
     )
     let constraints: string[] = []
 
-    if (statement.primaryKey) {
+    if (operation.primaryKey) {
       constraints.push(
         'primary key (' +
-          statement.primaryKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.primaryKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
       )
     }
 
-    for (let unique of statement.uniques ?? []) {
+    for (let unique of operation.uniques ?? []) {
       constraints.push(
         (unique.name ? 'constraint ' + quoteIdentifier(unique.name) + ' ' : '') +
           'unique (' +
@@ -430,7 +430,7 @@ function compileMysqlDefinitionStatements(statement: DataDefinitionOperation): S
       )
     }
 
-    for (let check of statement.checks ?? []) {
+    for (let check of operation.checks ?? []) {
       constraints.push(
         (check.name ? 'constraint ' + quoteIdentifier(check.name) + ' ' : '') +
           'check (' +
@@ -439,7 +439,7 @@ function compileMysqlDefinitionStatements(statement: DataDefinitionOperation): S
       )
     }
 
-    for (let foreignKey of statement.foreignKeys ?? []) {
+    for (let foreignKey of operation.foreignKeys ?? []) {
       let clause =
         (foreignKey.name ? 'constraint ' + quoteIdentifier(foreignKey.name) + ' ' : '') +
         'foreign key (' +
@@ -463,17 +463,17 @@ function compileMysqlDefinitionStatements(statement: DataDefinitionOperation): S
 
     let sql =
       'create table ' +
-      (statement.ifNotExists ? 'if not exists ' : '') +
-      quoteTableRef(statement.table) +
+      (operation.ifNotExists ? 'if not exists ' : '') +
+      quoteTableRef(operation.table) +
       ' (' +
       [...columns, ...constraints].join(', ') +
       ')'
 
     let statements: SqlStatement[] = [{ text: sql, values: [] }]
 
-    if (statement.comment) {
+    if (operation.comment) {
       statements.push({
-        text: 'alter table ' + quoteTableRef(statement.table) + ' comment = ' + quoteLiteral(statement.comment),
+        text: 'alter table ' + quoteTableRef(operation.table) + ' comment = ' + quoteLiteral(operation.comment),
         values: [],
       })
     }
@@ -481,11 +481,11 @@ function compileMysqlDefinitionStatements(statement: DataDefinitionOperation): S
     return statements
   }
 
-  if (statement.kind === 'alterTable') {
+  if (operation.kind === 'alterTable') {
     let statements: SqlStatement[] = []
 
-    for (let change of statement.changes) {
-      let sql = 'alter table ' + quoteTableRef(statement.table) + ' '
+    for (let change of operation.changes) {
+      let sql = 'alter table ' + quoteTableRef(operation.table) + ' '
 
       if (change.kind === 'addColumn') {
         sql += 'add column ' + quoteIdentifier(change.column) + ' ' + compileMysqlColumn(change.definition)
@@ -547,134 +547,134 @@ function compileMysqlDefinitionStatements(statement: DataDefinitionOperation): S
     return statements
   }
 
-  if (statement.kind === 'renameTable') {
+  if (operation.kind === 'renameTable') {
     return [
       {
-        text: 'rename table ' + quoteTableRef(statement.from) + ' to ' + quoteTableRef(statement.to),
+        text: 'rename table ' + quoteTableRef(operation.from) + ' to ' + quoteTableRef(operation.to),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'dropTable') {
+  if (operation.kind === 'dropTable') {
     return [
       {
         text:
           'drop table ' +
-          (statement.ifExists ? 'if exists ' : '') +
-          quoteTableRef(statement.table),
+          (operation.ifExists ? 'if exists ' : '') +
+          quoteTableRef(operation.table),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'createIndex') {
+  if (operation.kind === 'createIndex') {
     return [
       {
         text:
           'create ' +
-          (statement.index.unique ? 'unique ' : '') +
+          (operation.index.unique ? 'unique ' : '') +
           'index ' +
-          quoteIdentifier(statement.index.name ?? defaultIndexName(statement.index.columns)) +
+          quoteIdentifier(operation.index.name ?? defaultIndexName(operation.index.columns)) +
           ' on ' +
-          quoteTableRef(statement.index.table) +
-          (statement.index.using ? ' using ' + statement.index.using : '') +
+          quoteTableRef(operation.index.table) +
+          (operation.index.using ? ' using ' + operation.index.using : '') +
           ' (' +
-          statement.index.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.index.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')' +
-          (statement.index.where ? ' where ' + statement.index.where : ''),
+          (operation.index.where ? ' where ' + operation.index.where : ''),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'dropIndex') {
+  if (operation.kind === 'dropIndex') {
     return [
       {
-        text: 'drop index ' + quoteIdentifier(statement.name) + ' on ' + quoteTableRef(statement.table),
+        text: 'drop index ' + quoteIdentifier(operation.name) + ' on ' + quoteTableRef(operation.table),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'renameIndex') {
+  if (operation.kind === 'renameIndex') {
     return [
       {
         text:
           'alter table ' +
-          quoteTableRef(statement.table) +
+          quoteTableRef(operation.table) +
           ' rename index ' +
-          quoteIdentifier(statement.from) +
+          quoteIdentifier(operation.from) +
           ' to ' +
-          quoteIdentifier(statement.to),
+          quoteIdentifier(operation.to),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'addForeignKey') {
+  if (operation.kind === 'addForeignKey') {
     return [
       {
         text:
           'alter table ' +
-          quoteTableRef(statement.table) +
+          quoteTableRef(operation.table) +
           ' add ' +
-          (statement.constraint.name
-            ? 'constraint ' + quoteIdentifier(statement.constraint.name) + ' '
+          (operation.constraint.name
+            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
             : '') +
           'foreign key (' +
-          statement.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
-          quoteTableRef(statement.constraint.references.table) +
+          quoteTableRef(operation.constraint.references.table) +
           ' (' +
-          statement.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')' +
-          (statement.constraint.onDelete ? ' on delete ' + statement.constraint.onDelete : '') +
-          (statement.constraint.onUpdate ? ' on update ' + statement.constraint.onUpdate : ''),
+          (operation.constraint.onDelete ? ' on delete ' + operation.constraint.onDelete : '') +
+          (operation.constraint.onUpdate ? ' on update ' + operation.constraint.onUpdate : ''),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'dropForeignKey') {
+  if (operation.kind === 'dropForeignKey') {
     return [
       {
         text:
           'alter table ' +
-          quoteTableRef(statement.table) +
+          quoteTableRef(operation.table) +
           ' drop foreign key ' +
-          quoteIdentifier(statement.name),
+          quoteIdentifier(operation.name),
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'addCheck') {
+  if (operation.kind === 'addCheck') {
     return [
       {
         text:
           'alter table ' +
-          quoteTableRef(statement.table) +
+          quoteTableRef(operation.table) +
           ' add ' +
-          (statement.constraint.name
-            ? 'constraint ' + quoteIdentifier(statement.constraint.name) + ' '
+          (operation.constraint.name
+            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
             : '') +
           'check (' +
-          statement.constraint.expression +
+          operation.constraint.expression +
           ')',
         values: [],
       },
     ]
   }
 
-  if (statement.kind === 'dropCheck') {
+  if (operation.kind === 'dropCheck') {
     return [
       {
         text:
           'alter table ' +
-          quoteTableRef(statement.table) +
+          quoteTableRef(operation.table) +
           ' drop check ' +
-          quoteIdentifier(statement.name),
+          quoteIdentifier(operation.name),
         values: [],
       },
     ]

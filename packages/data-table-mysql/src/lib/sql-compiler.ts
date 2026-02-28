@@ -3,9 +3,9 @@ import type { DataManipulationOperation, Predicate } from '@remix-run/data-table
 
 type JoinClause = Extract<DataManipulationOperation, { kind: 'select' }>['joins'][number]
 type UpsertOperation = Extract<DataManipulationOperation, { kind: 'upsert' }>
-type StatementTable = Extract<DataManipulationOperation, { kind: 'select' }>['table']
+type OperationTable = Extract<DataManipulationOperation, { kind: 'select' }>['table']
 
-type CompiledSql = {
+type CompiledSqlStatement = {
   text: string
   values: unknown[]
 }
@@ -14,21 +14,23 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileMysqlStatement(statement: DataManipulationOperation): CompiledSql {
-  if (statement.kind === 'raw') {
+export function compileMysqlStatement(
+  operation: DataManipulationOperation,
+): CompiledSqlStatement {
+  if (operation.kind === 'raw') {
     return {
-      text: statement.sql.text,
-      values: [...statement.sql.values],
+      text: operation.sql.text,
+      values: [...operation.sql.values],
     }
   }
 
   let context: CompileContext = { values: [] }
 
-  if (statement.kind === 'select') {
+  if (operation.kind === 'select') {
     let selection = '*'
 
-    if (statement.select !== '*') {
-      selection = statement.select
+    if (operation.select !== '*') {
+      selection = operation.select
         .map((field) => quotePath(field.column) + ' as ' + quoteIdentifier(field.alias))
         .join(', ')
     }
@@ -36,26 +38,26 @@ export function compileMysqlStatement(statement: DataManipulationOperation): Com
     return {
       text:
         'select ' +
-        (statement.distinct ? 'distinct ' : '') +
+        (operation.distinct ? 'distinct ' : '') +
         selection +
-        compileFromClause(statement.table, statement.joins, context) +
-        compileWhereClause(statement.where, context) +
-        compileGroupByClause(statement.groupBy) +
-        compileHavingClause(statement.having, context) +
-        compileOrderByClause(statement.orderBy) +
-        compileLimitClause(statement.limit) +
-        compileOffsetClause(statement.offset),
+        compileFromClause(operation.table, operation.joins, context) +
+        compileWhereClause(operation.where, context) +
+        compileGroupByClause(operation.groupBy) +
+        compileHavingClause(operation.having, context) +
+        compileOrderByClause(operation.orderBy) +
+        compileLimitClause(operation.limit) +
+        compileOffsetClause(operation.offset),
       values: context.values,
     }
   }
 
-  if (statement.kind === 'count' || statement.kind === 'exists') {
+  if (operation.kind === 'count' || operation.kind === 'exists') {
     let inner =
       'select 1' +
-      compileFromClause(statement.table, statement.joins, context) +
-      compileWhereClause(statement.where, context) +
-      compileGroupByClause(statement.groupBy) +
-      compileHavingClause(statement.having, context)
+      compileFromClause(operation.table, operation.joins, context) +
+      compileWhereClause(operation.where, context) +
+      compileGroupByClause(operation.groupBy) +
+      compileHavingClause(operation.having, context)
 
     return {
       text:
@@ -69,54 +71,52 @@ export function compileMysqlStatement(statement: DataManipulationOperation): Com
     }
   }
 
-  if (statement.kind === 'insert') {
-    return compileInsertStatement(statement.table, statement.values, context)
+  if (operation.kind === 'insert') {
+    return compileInsertStatement(operation.table, operation.values, context)
   }
 
-  if (statement.kind === 'insertMany') {
-    return compileInsertManyStatement(statement.table, statement.values, context)
+  if (operation.kind === 'insertMany') {
+    return compileInsertManyStatement(operation.table, operation.values, context)
   }
 
-  if (statement.kind === 'update') {
-    let columns = Object.keys(statement.changes)
+  if (operation.kind === 'update') {
+    let columns = Object.keys(operation.changes)
 
     return {
       text:
         'update ' +
-        quotePath(getTableName(statement.table)) +
+        quotePath(getTableName(operation.table)) +
         ' set ' +
         columns
-          .map(
-            (column) => quotePath(column) + ' = ' + pushValue(context, statement.changes[column]),
-          )
+          .map((column) => quotePath(column) + ' = ' + pushValue(context, operation.changes[column]))
           .join(', ') +
-        compileWhereClause(statement.where, context),
+        compileWhereClause(operation.where, context),
       values: context.values,
     }
   }
 
-  if (statement.kind === 'delete') {
+  if (operation.kind === 'delete') {
     return {
       text:
         'delete from ' +
-        quotePath(getTableName(statement.table)) +
-        compileWhereClause(statement.where, context),
+        quotePath(getTableName(operation.table)) +
+        compileWhereClause(operation.where, context),
       values: context.values,
     }
   }
 
-  if (statement.kind === 'upsert') {
-    return compileUpsertStatement(statement, context)
+  if (operation.kind === 'upsert') {
+    return compileUpsertStatement(operation, context)
   }
 
   throw new Error('Unsupported statement kind')
 }
 
 function compileInsertStatement(
-  table: StatementTable,
+  table: OperationTable,
   values: Record<string, unknown>,
   context: CompileContext,
-): CompiledSql {
+): CompiledSqlStatement {
   let columns = Object.keys(values)
 
   if (columns.length === 0) {
@@ -140,10 +140,10 @@ function compileInsertStatement(
 }
 
 function compileInsertManyStatement(
-  table: StatementTable,
+  table: OperationTable,
   rows: Record<string, unknown>[],
   context: CompileContext,
-): CompiledSql {
+): CompiledSqlStatement {
   if (rows.length === 0) {
     return {
       text: 'select 0 where 1 = 0',
@@ -184,16 +184,19 @@ function compileInsertManyStatement(
   }
 }
 
-function compileUpsertStatement(statement: UpsertOperation, context: CompileContext): CompiledSql {
-  let insertColumns = Object.keys(statement.values)
+function compileUpsertStatement(
+  operation: UpsertOperation,
+  context: CompileContext,
+): CompiledSqlStatement {
+  let insertColumns = Object.keys(operation.values)
 
   if (insertColumns.length === 0) {
     throw new Error('upsert requires at least one value')
   }
 
-  let updateValues = statement.update ?? statement.values
+  let updateValues = operation.update ?? operation.values
   let updateColumns = Object.keys(updateValues)
-  let fallbackNoopColumn = getTablePrimaryKey(statement.table)[0]
+  let fallbackNoopColumn = getTablePrimaryKey(operation.table)[0]
 
   let onDuplicate =
     updateColumns.length > 0
@@ -205,11 +208,11 @@ function compileUpsertStatement(statement: UpsertOperation, context: CompileCont
   return {
     text:
       'insert into ' +
-      quotePath(getTableName(statement.table)) +
+      quotePath(getTableName(operation.table)) +
       ' (' +
       insertColumns.map((column) => quotePath(column)).join(', ') +
       ') values (' +
-      insertColumns.map((column) => pushValue(context, statement.values[column])).join(', ') +
+      insertColumns.map((column) => pushValue(context, operation.values[column])).join(', ') +
       ') on duplicate key update ' +
       onDuplicate,
     values: context.values,
@@ -217,7 +220,7 @@ function compileUpsertStatement(statement: UpsertOperation, context: CompileCont
 }
 
 function compileFromClause(
-  table: StatementTable,
+  table: OperationTable,
   joins: JoinClause[],
   context: CompileContext,
 ): string {

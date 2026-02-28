@@ -3,9 +3,9 @@ import type { DataManipulationOperation, Predicate, SqlStatement } from '@remix-
 
 type JoinClause = Extract<DataManipulationOperation, { kind: 'select' }>['joins'][number]
 type UpsertOperation = Extract<DataManipulationOperation, { kind: 'upsert' }>
-type StatementTable = Extract<DataManipulationOperation, { kind: 'select' }>['table']
+type OperationTable = Extract<DataManipulationOperation, { kind: 'select' }>['table']
 
-type CompiledSql = {
+type CompiledSqlStatement = {
   text: string
   values: unknown[]
 }
@@ -14,33 +14,35 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compilePostgresStatement(statement: DataManipulationOperation): CompiledSql {
-  if (statement.kind === 'raw') {
-    return compileRawStatement(statement.sql)
+export function compilePostgresStatement(
+  operation: DataManipulationOperation,
+): CompiledSqlStatement {
+  if (operation.kind === 'raw') {
+    return compileRawStatement(operation.sql)
   }
 
   let context: CompileContext = { values: [] }
 
-  if (statement.kind === 'select') {
+  if (operation.kind === 'select') {
     let selection = '*'
 
-    if (statement.select !== '*') {
-      selection = statement.select
+    if (operation.select !== '*') {
+      selection = operation.select
         .map((field) => quotePath(field.column) + ' as ' + quoteIdentifier(field.alias))
         .join(', ')
     }
 
     let text =
       'select ' +
-      (statement.distinct ? 'distinct ' : '') +
+      (operation.distinct ? 'distinct ' : '') +
       selection +
-      compileFromClause(statement.table, statement.joins, context) +
-      compileWhereClause(statement.where, context) +
-      compileGroupByClause(statement.groupBy) +
-      compileHavingClause(statement.having, context) +
-      compileOrderByClause(statement.orderBy) +
-      compileLimitClause(statement.limit) +
-      compileOffsetClause(statement.offset)
+      compileFromClause(operation.table, operation.joins, context) +
+      compileWhereClause(operation.where, context) +
+      compileGroupByClause(operation.groupBy) +
+      compileHavingClause(operation.having, context) +
+      compileOrderByClause(operation.orderBy) +
+      compileLimitClause(operation.limit) +
+      compileOffsetClause(operation.offset)
 
     return {
       text,
@@ -48,13 +50,13 @@ export function compilePostgresStatement(statement: DataManipulationOperation): 
     }
   }
 
-  if (statement.kind === 'count' || statement.kind === 'exists') {
+  if (operation.kind === 'count' || operation.kind === 'exists') {
     let inner =
       'select 1' +
-      compileFromClause(statement.table, statement.joins, context) +
-      compileWhereClause(statement.where, context) +
-      compileGroupByClause(statement.groupBy) +
-      compileHavingClause(statement.having, context)
+      compileFromClause(operation.table, operation.joins, context) +
+      compileWhereClause(operation.where, context) +
+      compileGroupByClause(operation.groupBy) +
+      compileHavingClause(operation.having, context)
 
     return {
       text:
@@ -68,61 +70,61 @@ export function compilePostgresStatement(statement: DataManipulationOperation): 
     }
   }
 
-  if (statement.kind === 'insert') {
-    return compileInsertStatement(statement.table, statement.values, statement.returning, context)
+  if (operation.kind === 'insert') {
+    return compileInsertStatement(operation.table, operation.values, operation.returning, context)
   }
 
-  if (statement.kind === 'insertMany') {
+  if (operation.kind === 'insertMany') {
     return compileInsertManyStatement(
-      statement.table,
-      statement.values,
-      statement.returning,
+      operation.table,
+      operation.values,
+      operation.returning,
       context,
     )
   }
 
-  if (statement.kind === 'update') {
-    let changes = Object.keys(statement.changes)
+  if (operation.kind === 'update') {
+    let changes = Object.keys(operation.changes)
     let assignments = changes
-      .map((column) => quotePath(column) + ' = ' + pushValue(context, statement.changes[column]))
+      .map((column) => quotePath(column) + ' = ' + pushValue(context, operation.changes[column]))
       .join(', ')
 
     return {
       text:
         'update ' +
-        quotePath(getTableName(statement.table)) +
+        quotePath(getTableName(operation.table)) +
         ' set ' +
         assignments +
-        compileWhereClause(statement.where, context) +
-        compileReturningClause(statement.returning),
+        compileWhereClause(operation.where, context) +
+        compileReturningClause(operation.returning),
       values: context.values,
     }
   }
 
-  if (statement.kind === 'delete') {
+  if (operation.kind === 'delete') {
     return {
       text:
         'delete from ' +
-        quotePath(getTableName(statement.table)) +
-        compileWhereClause(statement.where, context) +
-        compileReturningClause(statement.returning),
+        quotePath(getTableName(operation.table)) +
+        compileWhereClause(operation.where, context) +
+        compileReturningClause(operation.returning),
       values: context.values,
     }
   }
 
-  if (statement.kind === 'upsert') {
-    return compileUpsertStatement(statement, context)
+  if (operation.kind === 'upsert') {
+    return compileUpsertStatement(operation, context)
   }
 
   throw new Error('Unsupported statement kind')
 }
 
 function compileInsertStatement(
-  table: StatementTable,
+  table: OperationTable,
   values: Record<string, unknown>,
   returning: '*' | string[] | undefined,
   context: CompileContext,
-): CompiledSql {
+): CompiledSqlStatement {
   let columns = Object.keys(values)
 
   if (columns.length === 0) {
@@ -154,11 +156,11 @@ function compileInsertStatement(
 }
 
 function compileInsertManyStatement(
-  table: StatementTable,
+  table: OperationTable,
   rows: Record<string, unknown>[],
   returning: '*' | string[] | undefined,
   context: CompileContext,
-): CompiledSql {
+): CompiledSqlStatement {
   if (rows.length === 0) {
     return {
       text: 'select 0 where 1 = 0',
@@ -203,9 +205,12 @@ function compileInsertManyStatement(
   }
 }
 
-function compileUpsertStatement(statement: UpsertOperation, context: CompileContext): CompiledSql {
-  let insertColumns = Object.keys(statement.values)
-  let conflictTarget = statement.conflictTarget ?? [...getTablePrimaryKey(statement.table)]
+function compileUpsertStatement(
+  operation: UpsertOperation,
+  context: CompileContext,
+): CompiledSqlStatement {
+  let insertColumns = Object.keys(operation.values)
+  let conflictTarget = operation.conflictTarget ?? [...getTablePrimaryKey(operation.table)]
 
   if (insertColumns.length === 0) {
     throw new Error('upsert requires at least one value')
@@ -213,10 +218,10 @@ function compileUpsertStatement(statement: UpsertOperation, context: CompileCont
 
   let quotedInsertColumns = insertColumns.map((column) => quotePath(column))
   let insertPlaceholders = insertColumns.map((column) =>
-    pushValue(context, statement.values[column]),
+    pushValue(context, operation.values[column]),
   )
 
-  let updateValues = statement.update ?? statement.values
+  let updateValues = operation.update ?? operation.values
   let updateColumns = Object.keys(updateValues)
   let onConflictClause = ''
 
@@ -238,19 +243,19 @@ function compileUpsertStatement(statement: UpsertOperation, context: CompileCont
   return {
     text:
       'insert into ' +
-      quotePath(getTableName(statement.table)) +
+      quotePath(getTableName(operation.table)) +
       ' (' +
       quotedInsertColumns.join(', ') +
       ') values (' +
       insertPlaceholders.join(', ') +
       ')' +
       onConflictClause +
-      compileReturningClause(statement.returning),
+      compileReturningClause(operation.returning),
     values: context.values,
   }
 }
 
-function compileRawStatement(statement: SqlStatement): CompiledSql {
+function compileRawStatement(statement: SqlStatement): CompiledSqlStatement {
   if (!statement.text.includes('?')) {
     return {
       text: statement.text,
@@ -272,7 +277,7 @@ function compileRawStatement(statement: SqlStatement): CompiledSql {
 }
 
 function compileFromClause(
-  table: StatementTable,
+  table: OperationTable,
   joins: JoinClause[],
   context: CompileContext,
 ): string {
