@@ -124,7 +124,11 @@ export interface CreateTableBuilder {
     options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
   addCheck(expression: string, options?: { name?: string }): void
-  addIndex(columns: string[], options?: Omit<IndexDefinition, 'table' | 'columns'>): void
+  addIndex(
+    name: string,
+    columns: string[],
+    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+  ): void
   comment(text: string): void
 }
 
@@ -146,7 +150,11 @@ export interface AlterTableBuilder {
   dropForeignKey(name: string): void
   addCheck(expression: string, options?: { name?: string }): void
   dropCheck(name: string): void
-  addIndex(columns: string[], options?: Omit<IndexDefinition, 'table' | 'columns'>): void
+  addIndex(
+    name: string,
+    columns: string[],
+    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+  ): void
   dropIndex(name: string): void
   comment(text: string): void
 }
@@ -476,8 +484,13 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
     this.checks.push({ expression, name: options?.name })
   }
 
-  addIndex(columns: string[], options?: Omit<IndexDefinition, 'table' | 'columns'>): void {
+  addIndex(
+    name: string,
+    columns: string[],
+    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+  ): void {
     this.indexes.push({
+      name,
       columns: [...columns],
       ...options,
     })
@@ -575,11 +588,16 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropCheck', name })
   }
 
-  addIndex(columns: string[], options?: Omit<IndexDefinition, 'table' | 'columns'>): void {
+  addIndex(
+    name: string,
+    columns: string[],
+    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+  ): void {
     this.extraStatements.push({
       kind: 'createIndex',
       index: {
         table: this.table,
+        name,
         columns: [...columns],
         ...options,
       },

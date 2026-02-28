@@ -292,7 +292,7 @@ let createUsers = createMigration({
       table.addColumn('id', c.integer().primaryKey())
       table.addColumn('email', c.varchar(255).notNull().unique())
       table.addColumn('created_at', c.timestamp({ withTimezone: true }).defaultNow())
-      table.addIndex(['email'], { name: 'users_email_idx' })
+      table.addIndex('users_email_idx', ['email'])
     })
   },
   async down({ schema }) {

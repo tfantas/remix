@@ -223,14 +223,14 @@ describe('migration runner', () => {
         await schema.createTable('app.users', (table) => {
           table.addColumn('id', column.integer().primaryKey())
           table.addColumn('email', column.text().notNull())
-          table.addIndex(['email'], { name: 'users_email_idx', unique: true })
+          table.addIndex('users_email_idx', ['email'], { unique: true })
           table.comment('Users table')
         })
 
         await schema.alterTable('app.users', (table) => {
           table.addColumn('status', column.text().default('active'))
           table.addCheck("status in ('active', 'disabled')", { name: 'users_status_check' })
-          table.addIndex(['status'], { name: 'users_status_idx' })
+          table.addIndex('users_status_idx', ['status'])
         })
 
         await schema.renameIndex('app.users', 'users_status_idx', 'users_status_idx_v2')
