@@ -10,7 +10,13 @@ import type {
   DatabaseAdapter,
   TransactionToken,
 } from './adapter.ts'
-import { column, createMigration, createMigrationRunner, parseMigrationFilename } from './migrations.ts'
+import {
+  column,
+  createMigration,
+  createMigrationRegistry,
+  createMigrationRunner,
+  parseMigrationFilename,
+} from './migrations.ts'
 import type { SqlStatement } from './sql.ts'
 
 type JournalRow = {
@@ -212,6 +218,91 @@ describe('migration column builder', () => {
 
   it('throws when onDelete is called before references', () => {
     assert.throws(() => column.integer().onDelete('cascade'), /requires references\(\) to be set first/)
+  })
+
+  it('throws when onUpdate is called before references', () => {
+    assert.throws(() => column.integer().onUpdate('cascade'), /requires references\(\) to be set first/)
+  })
+
+  it('supports every column constructor and modifier', () => {
+    let textSpec = column.text().nullable().defaultNow().build()
+    assert.equal(textSpec.type, 'text')
+    assert.equal(textSpec.nullable, true)
+    assert.deepEqual(textSpec.default, { kind: 'now' })
+
+    let integerSpec = column
+      .integer()
+      .defaultSql('42')
+      .unsigned()
+      .autoIncrement()
+      .identity({ always: true, start: 10, increment: 2 })
+      .build()
+    assert.equal(integerSpec.type, 'integer')
+    assert.deepEqual(integerSpec.default, { kind: 'sql', expression: '42' })
+    assert.equal(integerSpec.unsigned, true)
+    assert.equal(integerSpec.autoIncrement, true)
+    assert.deepEqual(integerSpec.identity, { always: true, start: 10, increment: 2 })
+
+    let bigintSpec = column.bigint().build()
+    assert.equal(bigintSpec.type, 'bigint')
+
+    let decimalSpec = column.decimal(8, 2).precision(12).scale(4).build()
+    assert.equal(decimalSpec.type, 'decimal')
+    assert.equal(decimalSpec.precision, 12)
+    assert.equal(decimalSpec.scale, 4)
+
+    let decimalWithPrecisionScale = column.decimal(4, 1).precision(10, 3).build()
+    assert.equal(decimalWithPrecisionScale.type, 'decimal')
+    assert.equal(decimalWithPrecisionScale.precision, 10)
+    assert.equal(decimalWithPrecisionScale.scale, 3)
+
+    let booleanSpec = column.boolean().build()
+    assert.equal(booleanSpec.type, 'boolean')
+
+    let uuidSpec = column.uuid().build()
+    assert.equal(uuidSpec.type, 'uuid')
+
+    let dateSpec = column.date().build()
+    assert.equal(dateSpec.type, 'date')
+
+    let timeSpec = column.time({ precision: 6, withTimezone: true }).timezone(false).build()
+    assert.equal(timeSpec.type, 'time')
+    assert.equal(timeSpec.precision, 6)
+    assert.equal(timeSpec.withTimezone, false)
+
+    let timestampSpec = column.timestamp({ precision: 3, withTimezone: true }).build()
+    assert.equal(timestampSpec.type, 'timestamp')
+    assert.equal(timestampSpec.precision, 3)
+    assert.equal(timestampSpec.withTimezone, true)
+
+    let jsonSpec = column.json().build()
+    assert.equal(jsonSpec.type, 'json')
+
+    let binarySpec = column.binary(64).length(128).build()
+    assert.equal(binarySpec.type, 'binary')
+    assert.equal(binarySpec.length, 128)
+
+    let enumSpec = column.enum(['one', 'two']).build()
+    assert.equal(enumSpec.type, 'enum')
+    assert.deepEqual(enumSpec.enumValues, ['one', 'two'])
+  })
+
+  it('retains existing reference metadata when references() is called again', () => {
+    let spec = column
+      .integer()
+      .references('auth.accounts', 'id', { name: 'accounts_fk' })
+      .onDelete('cascade')
+      .onUpdate('restrict')
+      .references('auth.users')
+      .build()
+
+    assert.deepEqual(spec.references, {
+      table: { schema: 'auth', name: 'users' },
+      columns: ['id'],
+      name: 'accounts_fk',
+      onDelete: 'cascade',
+      onUpdate: 'restrict',
+    })
   })
 })
 
@@ -430,6 +521,393 @@ describe('migration runner', () => {
 
     await assert.rejects(() => runner.up({ to: '99999999999999' }), /Unknown migration target/)
     await assert.rejects(() => runner.up({ step: 0 }), /positive integer/)
+  })
+
+  it('supports up() target and step boundaries', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migrations = [
+      {
+        id: '20260101000000',
+        name: 'users',
+        migration: createMigration({
+          async up({ schema }) {
+            await schema.createTable('users', (table) => {
+              table.addColumn('id', column.integer().primaryKey())
+            })
+          },
+          async down() {},
+        }),
+      },
+      {
+        id: '20260102000000',
+        name: 'posts',
+        migration: createMigration({
+          async up({ schema }) {
+            await schema.createTable('posts', (table) => {
+              table.addColumn('id', column.integer().primaryKey())
+            })
+          },
+          async down() {},
+        }),
+      },
+    ]
+
+    let targetRunner = createMigrationRunner(adapter, migrations)
+    await targetRunner.up({ to: '20260101000000' })
+    assert.deepEqual(
+      adapter.journalRows.map((row) => row.id),
+      ['20260101000000'],
+    )
+
+    adapter.journalRows = []
+    adapter.journalTableCreated = false
+    adapter.migratedOperations = []
+
+    let stepRunner = createMigrationRunner(adapter, migrations)
+    await stepRunner.up({ step: 1 })
+    assert.deepEqual(
+      adapter.journalRows.map((row) => row.id),
+      ['20260101000000'],
+    )
+  })
+
+  it('emits full schema operation shapes from builder methods', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ schema }) {
+        await schema.createTable('app.accounts', (table) => {
+          table.addColumn('id', column.integer().primaryKey())
+          table.addColumn('email', column.text().notNull())
+          table.addColumn('nickname', { type: 'text' })
+          table.addPrimaryKey(['id'], { name: 'accounts_pk' })
+          table.addUnique(['email'], { name: 'accounts_email_uq' })
+          table.addForeignKey(['id'], 'auth.users', ['id'], {
+            name: 'accounts_user_fk',
+            onDelete: 'cascade',
+            onUpdate: 'restrict',
+          })
+          table.addCheck('accounts_id_check', 'id > 0')
+          table.addIndex('accounts_email_idx', ['email', 'id'], {
+            unique: true,
+            where: 'id > 0',
+            using: 'btree',
+          })
+          table.comment('Accounts table')
+        })
+
+        await schema.alterTable('app.accounts', (table) => {
+          table.addColumn('status', column.text().default('active'))
+          table.changeColumn('status', column.varchar(20).notNull())
+          table.renameColumn('status', 'account_status')
+          table.dropColumn('legacy_status', { ifExists: true })
+          table.addPrimaryKey(['id'], { name: 'accounts_pk_v2' })
+          table.dropPrimaryKey('accounts_pk_v2')
+          table.addUnique(['account_status'], { name: 'accounts_status_uq' })
+          table.dropUnique('accounts_status_uq')
+          table.addForeignKey(['id'], 'app.accounts', ['id'], { name: 'accounts_self_fk' })
+          table.dropForeignKey('accounts_self_fk')
+          table.addCheck('accounts_status_check', "account_status in ('active', 'disabled')")
+          table.dropCheck('accounts_status_check')
+          table.addIndex('accounts_status_idx', ['account_status', 'id'])
+          table.dropIndex('accounts_status_idx')
+          table.comment('Accounts table v2')
+        })
+
+        await schema.renameTable('app.accounts', 'app.accounts_v2')
+        await schema.dropTable('app.accounts_v2', { ifExists: true, cascade: true })
+        await schema.createIndex('app.accounts', ['id', 'email'], {
+          name: 'accounts_compound_idx',
+          unique: true,
+        })
+        await schema.dropIndex('app.accounts', 'accounts_compound_idx', { ifExists: true })
+        await schema.renameIndex('app.accounts', 'accounts_old_idx', 'accounts_new_idx')
+        await schema.addForeignKey('app.accounts', ['id'], 'auth.users', undefined, {
+          name: 'accounts_fk_global',
+          onDelete: 'cascade',
+          onUpdate: 'restrict',
+        })
+        await schema.dropForeignKey('app.accounts', 'accounts_fk_global')
+        await schema.addCheck('app.accounts', 'accounts_global_check', 'id > 0')
+        await schema.dropCheck('app.accounts', 'accounts_global_check')
+        await schema.raw('analyze')
+
+        let journalExists = await schema.tableExists('data_table_migrations')
+        let idColumnExists = await schema.columnExists('app.accounts', 'id')
+
+        if (!journalExists || !idColumnExists) {
+          throw new Error('Expected schema introspection checks to succeed')
+        }
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'accounts', migration }])
+    await runner.up()
+
+    let kinds = adapter.migratedOperations.map((operation) => operation.kind)
+    assert.deepEqual(kinds, [
+      'createTable',
+      'createIndex',
+      'alterTable',
+      'createIndex',
+      'dropIndex',
+      'renameTable',
+      'dropTable',
+      'createIndex',
+      'dropIndex',
+      'renameIndex',
+      'addForeignKey',
+      'dropForeignKey',
+      'addCheck',
+      'dropCheck',
+      'raw',
+    ])
+  })
+
+  it('returns false for table and column checks when dryRun database blocks execution', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ schema }) {
+        let tableExists = await schema.tableExists('app.users')
+        let columnExists = await schema.columnExists('app.users', 'email')
+
+        if (tableExists || columnExists) {
+          throw new Error('Expected false for dry-run schema introspection')
+        }
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'dry_run', migration }])
+    await runner.up({ dryRun: true })
+  })
+
+  it('throws when a dryRun migration attempts to use db.exec', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ db }) {
+        await db.exec(rawSql('select 1'))
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'dry_run_exec', migration }])
+    await assert.rejects(
+      () => runner.up({ dryRun: true }),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message === 'Adapter execution failed' &&
+        'cause' in error &&
+        error.cause instanceof Error &&
+        error.cause.message === 'Cannot execute data operations while running migrations with dryRun',
+    )
+  })
+
+  it('allows compiling SQL through the dryRun database adapter', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ db }) {
+        let compiled = db.adapter.compileSql({
+          kind: 'raw',
+          sql: rawSql('select 1'),
+        })
+
+        if (compiled.length !== 1 || compiled[0]?.text !== 'raw') {
+          throw new Error('Unexpected compiled SQL shape')
+        }
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'dry_run_compile', migration }])
+    await runner.up({ dryRun: true })
+  })
+
+  it('throws when a dryRun migration attempts to open a transaction', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ db }) {
+        await db.transaction(async () => {})
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'dry_run_transaction', migration },
+    ])
+    await assert.rejects(
+      () => runner.up({ dryRun: true }),
+      /Cannot execute data operations while running migrations with dryRun/,
+    )
+  })
+
+  it('reads dryRun journal rows when the migration journal table already exists', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    adapter.journalTableCreated = true
+    adapter.journalRows = [
+      {
+        id: '20250101000000',
+        name: 'legacy',
+        checksum: 'legacy:legacy',
+        batch: 1,
+        applied_at: new Date().toISOString(),
+      },
+    ]
+
+    let migration = createMigration({
+      async up({ schema }) {
+        await schema.createTable('users', (table) => {
+          table.addColumn('id', column.integer().primaryKey())
+        })
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let result = await runner.up({ dryRun: true })
+
+    assert.deepEqual(result.applied.map((entry) => entry.id), ['20260101000000'])
+    assert.deepEqual(result.sql, [{ text: 'createTable', values: [] }])
+  })
+
+  it('ignores journal rows for migrations that are no longer registered', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    adapter.journalTableCreated = true
+    adapter.journalRows = [
+      {
+        id: '20200101000000',
+        name: 'orphaned',
+        checksum: 'orphaned:orphaned',
+        batch: 1,
+        applied_at: new Date().toISOString(),
+      },
+    ]
+
+    let migration = createMigration({
+      async up() {},
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'current', migration }])
+    await runner.up({ dryRun: true })
+  })
+
+  it('reports drifted status entries when journal checksum does not match migration checksum', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up() {},
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [
+      {
+        id: '20260101000000',
+        name: 'users',
+        checksum: 'checksum_a',
+        migration,
+      },
+    ])
+
+    await runner.up()
+
+    let driftedRunner = createMigrationRunner(adapter, [
+      {
+        id: '20260101000000',
+        name: 'users',
+        checksum: 'checksum_b',
+        migration,
+      },
+    ])
+
+    let statuses = await driftedRunner.status()
+    assert.deepEqual(statuses.map((status) => status.status), ['drifted'])
+  })
+})
+
+describe('migration registry', () => {
+  it('defaults transaction mode to auto when omitted', () => {
+    let migration = createMigration({
+      async up() {},
+      async down() {},
+    })
+
+    assert.equal(migration.transaction, 'auto')
+  })
+
+  it('accepts explicit transaction mode values', () => {
+    let migration = createMigration({
+      transaction: 'none',
+      async up() {},
+      async down() {},
+    })
+
+    assert.equal(migration.transaction, 'none')
+  })
+
+  it('sorts migrations by id and rejects duplicate ids', () => {
+    let first = {
+      id: '20260101000000',
+      name: 'first',
+      migration: createMigration({ async up() {}, async down() {} }),
+    }
+    let second = {
+      id: '20260102000000',
+      name: 'second',
+      migration: createMigration({ async up() {}, async down() {} }),
+    }
+
+    let registry = createMigrationRegistry([second, first])
+    assert.deepEqual(
+      registry.list().map((migration) => migration.id),
+      ['20260101000000', '20260102000000'],
+    )
+
+    assert.throws(
+      () =>
+        createMigrationRegistry([
+          first,
+          {
+            ...first,
+            name: 'duplicate',
+          },
+        ]),
+      /Duplicate migration id/,
+    )
+
+    assert.throws(
+      () =>
+        registry.register({
+          ...first,
+          name: 'duplicate',
+        }),
+      /Duplicate migration id/,
+    )
+  })
+
+  it('works when migration runners are created from a registry input', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let registry = createMigrationRegistry()
+
+    registry.register({
+      id: '20260101000000',
+      name: 'users',
+      migration: createMigration({
+        async up({ schema }) {
+          await schema.createTable('users', (table) => {
+            table.addColumn('id', column.integer().primaryKey())
+          })
+        },
+        async down() {},
+      }),
+    })
+
+    let runner = createMigrationRunner(adapter, registry)
+    await runner.up()
+
+    assert.deepEqual(
+      adapter.journalRows.map((row) => row.id),
+      ['20260101000000'],
+    )
   })
 })
 

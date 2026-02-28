@@ -1059,36 +1059,23 @@ function assertNoMigrationDrift(
 
 function createDryRunDatabase(adapter: DatabaseAdapter): Database {
   let error = new Error('Cannot execute data operations while running migrations with dryRun')
+  let throwDryRunError = async (): Promise<never> => {
+    throw error
+  }
   let dryRunAdapter: DatabaseAdapter = {
     dialect: adapter.dialect,
     capabilities: adapter.capabilities,
     compileSql(operation) {
       return adapter.compileSql(operation)
     },
-    async execute() {
-      throw error
-    },
-    async migrate() {
-      throw error
-    },
-    async beginTransaction() {
-      throw error
-    },
-    async commitTransaction() {
-      throw error
-    },
-    async rollbackTransaction() {
-      throw error
-    },
-    async createSavepoint() {
-      throw error
-    },
-    async rollbackToSavepoint() {
-      throw error
-    },
-    async releaseSavepoint() {
-      throw error
-    },
+    execute: throwDryRunError,
+    migrate: throwDryRunError,
+    beginTransaction: throwDryRunError,
+    commitTransaction: throwDryRunError,
+    rollbackTransaction: throwDryRunError,
+    createSavepoint: throwDryRunError,
+    rollbackToSavepoint: throwDryRunError,
+    releaseSavepoint: throwDryRunError,
   }
 
   return createDatabase(dryRunAdapter)
