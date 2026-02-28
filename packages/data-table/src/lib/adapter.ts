@@ -494,10 +494,6 @@ export type AdapterCapabilities = {
  */
 export type AdapterCapabilityOverrides = Pretty<Partial<AdapterCapabilities>>
 
-export interface SqlCompiler {
-  compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[]
-}
-
 /**
  * Runtime contract implemented by concrete database adapters.
  */

@@ -281,7 +281,8 @@ await db.transaction(async (tx) => {
 ## Migrations
 
 `data-table` includes a first-class migration system under `remix/data-table/migrations`.
-Migrations are adapter-driven: each adapter compiles and executes DDL through its own dialect.
+Migrations are adapter-driven: adapters execute SQL for their dialect/runtime, and SQL compilation
+is handled by a shared internal operation compiler with dialect-specific behavior.
 
 ### Typical Setup (Node.js)
 

@@ -55,7 +55,6 @@ export type {
   SelectColumn,
   SelectOperation,
   SetTableCommentChange,
-  SqlCompiler,
   TableRef,
   TransactionOptions,
   TransactionToken,

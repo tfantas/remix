@@ -42,6 +42,36 @@ let accountProjects = createTable({
 })
 
 describe('mysql adapter', () => {
+  it('applies explicit capability overrides', () => {
+    let adapter = createMysqlDatabaseAdapter(
+      {
+        async query() {
+          return [[], []]
+        },
+        async beginTransaction() {},
+        async commit() {},
+        async rollback() {},
+      } as never,
+      {
+        capabilities: {
+          returning: true,
+          savepoints: false,
+          upsert: false,
+          transactionalDdl: true,
+          migrationLock: false,
+        },
+      },
+    )
+
+    assert.deepEqual(adapter.capabilities, {
+      returning: true,
+      savepoints: false,
+      upsert: false,
+      transactionalDdl: true,
+      migrationLock: false,
+    })
+  })
+
   it('short-circuits insertMany([]) and returns empty rows for returning queries', async () => {
     let calls = 0
 
@@ -136,6 +166,43 @@ describe('mysql adapter', () => {
     })
 
     assert.deepEqual(lifecycle, ['getConnection', 'begin', 'commit', 'release'])
+  })
+
+  it('supports pooled transactions when getConnection() omits release()', async () => {
+    let lifecycle: string[] = []
+
+    let poolConnection = {
+      async query() {
+        return [{ affectedRows: 1, insertId: 1 }, []]
+      },
+      async beginTransaction() {
+        lifecycle.push('begin')
+      },
+      async commit() {
+        lifecycle.push('commit')
+      },
+      async rollback() {
+        lifecycle.push('rollback')
+      },
+    }
+
+    let pool = {
+      async query() {
+        throw new Error('unexpected root query')
+      },
+      async getConnection() {
+        lifecycle.push('getConnection')
+        return poolConnection
+      },
+    }
+
+    let db = createDatabase(createMysqlDatabaseAdapter(pool as never))
+
+    await db.transaction(async (transactionDatabase) => {
+      await transactionDatabase.query(accounts).insert({ id: 1, email: 'a@example.com' })
+    })
+
+    assert.deepEqual(lifecycle, ['getConnection', 'begin', 'commit'])
   })
 
   it('applies transaction options when provided', async () => {
@@ -240,6 +307,47 @@ describe('mysql adapter', () => {
     )
 
     assert.deepEqual(lifecycle, ['getConnection', 'begin', 'rollback', 'release'])
+  })
+
+  it('rolls back pooled transactions when getConnection() omits release()', async () => {
+    let lifecycle: string[] = []
+
+    let poolConnection = {
+      async query() {
+        return [{ affectedRows: 0, insertId: undefined }, []]
+      },
+      async beginTransaction() {
+        lifecycle.push('begin')
+      },
+      async commit() {
+        lifecycle.push('commit')
+      },
+      async rollback() {
+        lifecycle.push('rollback')
+      },
+    }
+
+    let pool = {
+      async query() {
+        throw new Error('unexpected root query')
+      },
+      async getConnection() {
+        lifecycle.push('getConnection')
+        return poolConnection
+      },
+    }
+
+    let db = createDatabase(createMysqlDatabaseAdapter(pool as never))
+
+    await assert.rejects(
+      () =>
+        db.transaction(async () => {
+          throw new Error('force rollback')
+        }),
+      /force rollback/,
+    )
+
+    assert.deepEqual(lifecycle, ['getConnection', 'begin', 'rollback'])
   })
 
   it('supports savepoint lifecycle and escapes savepoint names', async () => {

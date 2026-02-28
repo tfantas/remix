@@ -7,6 +7,7 @@ Use this package when you want `data-table` APIs backed by `mysql2`.
 
 - **Native `mysql2` Integration**: Works with `mysql2/promise` connection pools
 - **Full `data-table` API Support**: Queries, relations, writes, and transactions
+- **Shared Operation Compiler**: Uses the shared internal `data-table` SQL compiler with dialect-specific behavior
 - **Migration DDL Support**: Compiles and executes `DataMigrationOperation` operations for `remix/data-table/migrations`
 - **MySQL Capabilities Enabled By Default**:
   - `returning: false`

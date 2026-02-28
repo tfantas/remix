@@ -42,6 +42,39 @@ let accountProjects = createTable({
 })
 
 describe('postgres adapter', () => {
+  it('applies explicit capability overrides', () => {
+    let adapter = createPostgresDatabaseAdapter(
+      {
+        async query() {
+          return {
+            rows: [],
+            rowCount: 0,
+            command: 'SELECT',
+            oid: 0,
+            fields: [],
+          }
+        },
+      } as never,
+      {
+        capabilities: {
+          returning: false,
+          savepoints: false,
+          upsert: false,
+          transactionalDdl: false,
+          migrationLock: false,
+        },
+      },
+    )
+
+    assert.deepEqual(adapter.capabilities, {
+      returning: false,
+      savepoints: false,
+      upsert: false,
+      transactionalDdl: false,
+      migrationLock: false,
+    })
+  })
+
   it('short-circuits insertMany([]) and returns empty rows for returning queries', async () => {
     let calls = 0
 
@@ -240,6 +273,39 @@ describe('postgres adapter', () => {
     assert.deepEqual(lifecycle, ['connect', 'begin', 'commit', 'release'])
   })
 
+  it('supports pooled transactions when connect() clients omit release()', async () => {
+    let lifecycle: string[] = []
+
+    let transactionClient = {
+      async query(text: string) {
+        lifecycle.push(text)
+        return {
+          rows: [],
+          rowCount: 0,
+          command: 'SELECT',
+          oid: 0,
+          fields: [],
+        }
+      },
+    }
+
+    let pool = {
+      async query() {
+        throw new Error('unexpected pool query')
+      },
+      async connect() {
+        lifecycle.push('connect')
+        return transactionClient
+      },
+    }
+
+    let db = createDatabase(createPostgresDatabaseAdapter(pool as never))
+
+    await db.transaction(async () => undefined)
+
+    assert.deepEqual(lifecycle, ['connect', 'begin', 'commit'])
+  })
+
   it('rolls back transactions and releases connected clients', async () => {
     let lifecycle: string[] = []
 
@@ -280,6 +346,45 @@ describe('postgres adapter', () => {
     )
 
     assert.deepEqual(lifecycle, ['connect', 'begin', 'rollback', 'release'])
+  })
+
+  it('rolls back pooled transactions when connect() clients omit release()', async () => {
+    let lifecycle: string[] = []
+
+    let transactionClient = {
+      async query(text: string) {
+        lifecycle.push(text)
+        return {
+          rows: [],
+          rowCount: 0,
+          command: 'SELECT',
+          oid: 0,
+          fields: [],
+        }
+      },
+    }
+
+    let pool = {
+      async query() {
+        throw new Error('unexpected pool query')
+      },
+      async connect() {
+        lifecycle.push('connect')
+        return transactionClient
+      },
+    }
+
+    let db = createDatabase(createPostgresDatabaseAdapter(pool as never))
+
+    await assert.rejects(
+      () =>
+        db.transaction(async () => {
+          throw new Error('force rollback')
+        }),
+      /force rollback/,
+    )
+
+    assert.deepEqual(lifecycle, ['connect', 'begin', 'rollback'])
   })
 
   it('supports savepoint lifecycle and escapes savepoint names', async () => {
