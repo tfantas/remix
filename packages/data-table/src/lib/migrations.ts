@@ -4,7 +4,7 @@ import type {
   AlterTableChange,
   CheckConstraint,
   ColumnDefinition,
-  DataDefinitionStatement,
+  DataDefinitionOperation,
   DatabaseAdapter,
   ForeignKeyAction,
   ForeignKeyConstraint,
@@ -59,7 +59,7 @@ export type MigrationPlan = {
   migration: MigrationDescriptor
   direction: MigrationDirection
   transaction: MigrationTransactionMode
-  statements: DataDefinitionStatement[]
+  statements: DataDefinitionOperation[]
 }
 
 export type MigrationJournalRow = {
@@ -490,7 +490,7 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
 
 class AlterTableBuilderRuntime implements AlterTableBuilder {
   alterChanges: AlterTableChange[] = []
-  extraStatements: DataDefinitionStatement[] = []
+  extraStatements: DataDefinitionOperation[] = []
   table: TableRef
 
   constructor(table: TableRef) {
@@ -601,7 +601,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 
 function createSchemaApi(
   db: Database,
-  emit: (statement: DataDefinitionStatement) => Promise<void>,
+  emit: (statement: DataDefinitionOperation) => Promise<void>,
 ): MigrationSchemaApi {
   return {
     async createTable(name, define, options) {

@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
-import type { DataDefinitionStatement } from '@remix-run/data-table'
+import type { DataDefinitionOperation } from '@remix-run/data-table'
 import { createDatabase, createTable, eq, inList, sql } from '@remix-run/data-table'
 
 import { createPostgresDatabaseAdapter } from './adapter.ts'
@@ -580,7 +580,7 @@ describe('postgres adapter', () => {
       },
     } as never)
 
-    let operations: DataDefinitionStatement[] = [
+    let operations: DataDefinitionOperation[] = [
       {
         kind: 'createTable',
         table: { schema: 'app', name: 'users' },

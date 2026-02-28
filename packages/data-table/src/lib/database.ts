@@ -3,21 +3,21 @@ import type { Schema } from '@remix-run/data-schema'
 
 import type {
   DataManipulationResult,
-  CountStatement,
+  CountOperation,
   DatabaseAdapter,
-  DeleteStatement,
-  ExistsStatement,
-  InsertManyStatement,
-  InsertStatement,
+  DeleteOperation,
+  ExistsOperation,
+  InsertManyOperation,
+  InsertOperation,
   JoinClause,
   JoinType,
   ReturningSelection,
   SelectColumn,
-  SelectStatement,
+  SelectOperation,
   TransactionOptions,
   TransactionToken,
-  UpdateStatement,
-  UpsertStatement,
+  UpdateOperation,
+  UpsertOperation,
 } from './adapter.ts'
 import { DataTableAdapterError, DataTableQueryError, DataTableValidationError } from './errors.ts'
 import type {
@@ -48,7 +48,7 @@ import type { Predicate, WhereInput } from './operators.ts'
 import { and, eq, inList, normalizeWhereInput, or } from './operators.ts'
 import type { SqlStatement } from './sql.ts'
 import { rawSql, isSqlStatement } from './sql.ts'
-import type { DataManipulationStatement } from './adapter.ts'
+import type { DataManipulationOperation } from './adapter.ts'
 import type { Pretty } from './types.ts'
 import { normalizeColumnInput } from './references.ts'
 import type { ColumnInput, NormalizeColumnInput, TableMetadataLike } from './references.ts'
@@ -770,7 +770,7 @@ class DatabaseRuntime implements Database {
     }
   }
 
-  async [executeStatement](statement: DataManipulationStatement): Promise<DataManipulationResult> {
+  async [executeStatement](statement: DataManipulationOperation): Promise<DataManipulationResult> {
     try {
       return await this.#adapter.execute({
         operation: statement,
@@ -1122,7 +1122,7 @@ export class QueryBuilder<
    * @returns Number of rows that match the current query scope.
    */
   async count(): Promise<number> {
-    let statement: CountStatement<AnyTable> = {
+    let statement: CountOperation<AnyTable> = {
       kind: 'count',
       table: this.#table,
       joins: [...this.#state.joins],
@@ -1149,7 +1149,7 @@ export class QueryBuilder<
    * @returns `true` when at least one row matches the current query scope.
    */
   async exists(): Promise<boolean> {
-    let statement: ExistsStatement<AnyTable> = {
+    let statement: ExistsOperation<AnyTable> = {
       kind: 'exists',
       table: this.#table,
       joins: [...this.#state.joins],
@@ -1201,7 +1201,7 @@ export class QueryBuilder<
     assertReturningCapability(this.#database.adapter, 'insert', returning)
 
     if (returning) {
-      let statement: InsertStatement<AnyTable> = {
+      let statement: InsertOperation<AnyTable> = {
         kind: 'insert',
         table: this.#table,
         values: preparedValues,
@@ -1218,7 +1218,7 @@ export class QueryBuilder<
       }
     }
 
-    let statement: InsertStatement<AnyTable> = {
+    let statement: InsertOperation<AnyTable> = {
       kind: 'insert',
       table: this.#table,
       values: preparedValues,
@@ -1270,7 +1270,7 @@ export class QueryBuilder<
     assertReturningCapability(this.#database.adapter, 'insertMany', returning)
 
     if (returning) {
-      let statement: InsertManyStatement<AnyTable> = {
+      let statement: InsertManyOperation<AnyTable> = {
         kind: 'insertMany',
         table: this.#table,
         values: preparedValues,
@@ -1286,7 +1286,7 @@ export class QueryBuilder<
       }
     }
 
-    let statement: InsertManyStatement<AnyTable> = {
+    let statement: InsertManyOperation<AnyTable> = {
       kind: 'insertMany',
       table: this.#table,
       values: preparedValues,
@@ -1360,7 +1360,7 @@ export class QueryBuilder<
       })
     }
 
-    let statement: UpdateStatement<AnyTable> = {
+    let statement: UpdateOperation<AnyTable> = {
       kind: 'update',
       table: this.#table,
       changes: preparedChanges,
@@ -1430,7 +1430,7 @@ export class QueryBuilder<
       })
     }
 
-    let statement: DeleteStatement<AnyTable> = {
+    let statement: DeleteOperation<AnyTable> = {
       kind: 'delete',
       table: this.#table,
       where: [...this.#state.where],
@@ -1501,7 +1501,7 @@ export class QueryBuilder<
     assertReturningCapability(this.#database.adapter, 'upsert', returning)
 
     if (returning) {
-      let statement: UpsertStatement<AnyTable> = {
+      let statement: UpsertOperation<AnyTable> = {
         kind: 'upsert',
         table: this.#table,
         values: preparedValues,
@@ -1520,7 +1520,7 @@ export class QueryBuilder<
       }
     }
 
-    let statement: UpsertStatement<AnyTable> = {
+    let statement: UpsertOperation<AnyTable> = {
       kind: 'upsert',
       table: this.#table,
       values: preparedValues,
@@ -1537,7 +1537,7 @@ export class QueryBuilder<
     return metadata
   }
 
-  #toSelectStatement(): SelectStatement<AnyTable> {
+  #toSelectStatement(): SelectOperation<AnyTable> {
     return {
       kind: 'select',
       table: this.#table,

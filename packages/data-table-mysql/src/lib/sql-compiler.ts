@@ -1,9 +1,9 @@
 import { getTableName, getTablePrimaryKey } from '@remix-run/data-table'
-import type { DataManipulationStatement, Predicate } from '@remix-run/data-table'
+import type { DataManipulationOperation, Predicate } from '@remix-run/data-table'
 
-type JoinClause = Extract<DataManipulationStatement, { kind: 'select' }>['joins'][number]
-type UpsertStatement = Extract<DataManipulationStatement, { kind: 'upsert' }>
-type StatementTable = Extract<DataManipulationStatement, { kind: 'select' }>['table']
+type JoinClause = Extract<DataManipulationOperation, { kind: 'select' }>['joins'][number]
+type UpsertOperation = Extract<DataManipulationOperation, { kind: 'upsert' }>
+type StatementTable = Extract<DataManipulationOperation, { kind: 'select' }>['table']
 
 type CompiledSql = {
   text: string
@@ -14,7 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileMysqlStatement(statement: DataManipulationStatement): CompiledSql {
+export function compileMysqlStatement(statement: DataManipulationOperation): CompiledSql {
   if (statement.kind === 'raw') {
     return {
       text: statement.sql.text,
@@ -184,7 +184,7 @@ function compileInsertManyStatement(
   }
 }
 
-function compileUpsertStatement(statement: UpsertStatement, context: CompileContext): CompiledSql {
+function compileUpsertStatement(statement: UpsertOperation, context: CompileContext): CompiledSql {
   let insertColumns = Object.keys(statement.values)
 
   if (insertColumns.length === 0) {

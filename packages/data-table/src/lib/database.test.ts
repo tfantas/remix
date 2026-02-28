@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import { boolean, number, string } from '@remix-run/data-schema'
 
-import type { DataManipulationStatement, DatabaseAdapter } from './adapter.ts'
+import type { DataManipulationOperation, DatabaseAdapter } from './adapter.ts'
 import { createDatabase } from './database.ts'
 import { DataTableAdapterError, DataTableQueryError, DataTableValidationError } from './errors.ts'
 import { belongsTo, createTable, hasMany, hasManyThrough, hasOne, timestamps } from './table.ts'
@@ -740,7 +740,7 @@ describe('query builder', () => {
   })
 
   it('supports insertMany() batches that include at least one explicit value', async () => {
-    let statements: DataManipulationStatement[] = []
+    let statements: DataManipulationOperation[] = []
 
     let adapter: DatabaseAdapter = {
       dialect: 'fake',

@@ -5,7 +5,7 @@ import type {
   AdapterExecuteRequest,
   AdapterMigrateRequest,
   DataDefinitionResult,
-  DataDefinitionStatement,
+  DataDefinitionOperation,
   DataManipulationResult,
   DatabaseAdapter,
   TransactionToken,
@@ -33,18 +33,18 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   journalTableCreated = false
   journalTableName = 'data_table_migrations'
   journalRows: JournalRow[] = []
-  migratedOperations: DataDefinitionStatement[] = []
+  migratedOperations: DataDefinitionOperation[] = []
   executedRawSql: SqlStatement[] = []
   lockAcquireCount = 0
   lockReleaseCount = 0
   beginTransactionCount = 0
   commitTransactionCount = 0
   rollbackTransactionCount = 0
-  failOnMigrateKind: DataDefinitionStatement['kind'] | undefined
+  failOnMigrateKind: DataDefinitionOperation['kind'] | undefined
   #transactionCounter = 0
   #tokens = new Set<string>()
 
-  compileSql(operation: DataDefinitionStatement | AdapterExecuteRequest['operation']): SqlStatement[] {
+  compileSql(operation: DataDefinitionOperation | AdapterExecuteRequest['operation']): SqlStatement[] {
     return [{ text: operation.kind, values: [] }]
   }
 

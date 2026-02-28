@@ -1,1 +1,1 @@
-BREAKING CHANGE: Update the sqlite adapter to the split DML/DDL contract (`execute` for `DataManipulationStatement`, `migrate` for `DataDefinitionStatement`), rename request payload field `statement` to `operation`, and add adapter-level DDL compilation/execution support for migrations.
+BREAKING CHANGE: Update the sqlite adapter to the split DML/DDL contract (`execute` for `DataManipulationOperation`, `migrate` for `DataDefinitionOperation`), rename request payload field `statement` to `operation`, and add adapter-level DDL compilation/execution support for migrations.

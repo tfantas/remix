@@ -3,9 +3,9 @@ import type {
   AdapterExecuteRequest,
   AdapterMigrateRequest,
   DataDefinitionResult,
-  DataDefinitionStatement,
+  DataDefinitionOperation,
   DataManipulationResult,
-  DataManipulationStatement,
+  DataManipulationOperation,
   DatabaseAdapter,
   ColumnDefinition,
   SqlStatement,
@@ -52,7 +52,7 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  compileSql(operation: DataManipulationStatement | DataDefinitionStatement): SqlStatement[] {
+  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
       let compiled = compileSqliteStatement(operation)
       return [{ text: compiled.text, values: compiled.values }]
@@ -322,8 +322,8 @@ function isInsertStatement(
 }
 
 function isDataManipulationOperation(
-  operation: DataManipulationStatement | DataDefinitionStatement,
-): operation is DataManipulationStatement {
+  operation: DataManipulationOperation | DataDefinitionOperation,
+): operation is DataManipulationOperation {
   return (
     operation.kind === 'select' ||
     operation.kind === 'count' ||
@@ -337,7 +337,7 @@ function isDataManipulationOperation(
   )
 }
 
-function compileSqliteDefinitionStatements(statement: DataDefinitionStatement): SqlStatement[] {
+function compileSqliteDefinitionStatements(statement: DataDefinitionOperation): SqlStatement[] {
   if (statement.kind === 'raw') {
     return [{ text: statement.sql.text, values: [...statement.sql.values] }]
   }

@@ -3,9 +3,9 @@ import type {
   AdapterMigrateRequest,
   AdapterExecuteRequest,
   DataDefinitionResult,
-  DataDefinitionStatement,
+  DataDefinitionOperation,
   DataManipulationResult,
-  DataManipulationStatement,
+  DataManipulationOperation,
   DatabaseAdapter,
   ColumnDefinition,
   SqlStatement,
@@ -88,7 +88,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  compileSql(operation: DataManipulationStatement | DataDefinitionStatement): SqlStatement[] {
+  compileSql(operation: DataManipulationOperation | DataDefinitionOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
       let compiled = compilePostgresStatement(operation)
       return [{ text: compiled.text, values: compiled.values }]
@@ -365,8 +365,8 @@ function isInsertStatement(
 }
 
 function isDataManipulationOperation(
-  operation: DataManipulationStatement | DataDefinitionStatement,
-): operation is DataManipulationStatement {
+  operation: DataManipulationOperation | DataDefinitionOperation,
+): operation is DataManipulationOperation {
   return (
     operation.kind === 'select' ||
     operation.kind === 'count' ||
@@ -380,7 +380,7 @@ function isDataManipulationOperation(
   )
 }
 
-function compilePostgresDefinitionStatements(statement: DataDefinitionStatement): SqlStatement[] {
+function compilePostgresDefinitionStatements(statement: DataDefinitionOperation): SqlStatement[] {
   if (statement.kind === 'raw') {
     return [{ text: statement.sql.text, values: [...statement.sql.values] }]
   }

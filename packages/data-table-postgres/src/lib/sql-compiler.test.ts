@@ -18,7 +18,7 @@ import {
   ne,
   notInList,
   notNull,
-  type DataManipulationStatement,
+  type DataManipulationOperation,
   type DatabaseAdapter,
   or,
 } from '@remix-run/data-table'
@@ -44,7 +44,7 @@ let tasks = createTable({
   },
 })
 
-let statements: DataManipulationStatement[] = []
+let statements: DataManipulationOperation[] = []
 
 let fakeAdapter = {
   capabilities: {

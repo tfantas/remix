@@ -7,7 +7,7 @@ Use this package when you want `data-table` APIs backed by `pg`.
 
 - **Native `pg` Integration**: Works with `Pool` and Postgres connection strings
 - **Full `data-table` API Support**: Queries, relations, writes, and transactions
-- **Migration DDL Support**: Compiles and executes `DataDefinitionStatement` operations for `remix/data-table/migrations`
+- **Migration DDL Support**: Compiles and executes `DataDefinitionOperation` operations for `remix/data-table/migrations`
 - **Postgres Capabilities Enabled By Default**:
   - `returning: true`
   - `savepoints: true`
