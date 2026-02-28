@@ -1,0 +1,1 @@
+BREAKING CHANGE: Update the postgres adapter to the split DML/DDL contract (`execute` for `DataManipulationStatement`, `migrate` for `DataDefinitionStatement`), rename request payload field `statement` to `operation`, and add adapter-level DDL compilation/execution plus migration locking support.

@@ -7,10 +7,13 @@ Use this package when you want `data-table` APIs backed by `mysql2`.
 
 - **Native `mysql2` Integration**: Works with `mysql2/promise` connection pools
 - **Full `data-table` API Support**: Queries, relations, writes, and transactions
+- **Migration DDL Support**: Compiles and executes `DataDefinitionStatement` operations for `remix/data-table/migrations`
 - **MySQL Capabilities Enabled By Default**:
   - `returning: false`
   - `savepoints: true`
   - `upsert: true`
+  - `transactionalDdl: false`
+  - `migrationLock: true`
 
 ## Installation
 
@@ -38,6 +41,8 @@ Use `db.query(...)`, relation loading, and transactions from `remix/data-table`.
 - `returning: false`
 - `savepoints: true`
 - `upsert: true`
+- `transactionalDdl: false`
+- `migrationLock: true`
 
 ## Advanced Usage
 

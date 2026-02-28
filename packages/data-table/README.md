@@ -278,6 +278,45 @@ await db.transaction(async (tx) => {
 })
 ```
 
+## Migrations
+
+`data-table` includes a first-class migration system under `remix/data-table/migrations`.
+Migrations are adapter-driven: each adapter compiles and executes DDL through its own dialect.
+
+```ts
+import { createMigration, createMigrationRegistry, createMigrationRunner, column as c } from 'remix/data-table/migrations'
+
+let createUsers = createMigration({
+  async up({ schema }) {
+    await schema.createTable('users', (table) => {
+      table.addColumn('id', c.integer().primaryKey())
+      table.addColumn('email', c.varchar(255).notNull().unique())
+      table.addColumn('created_at', c.timestamp({ withTimezone: true }).defaultNow())
+      table.addIndex(['email'], { name: 'users_email_idx' })
+    })
+  },
+  async down({ schema }) {
+    await schema.dropTable('users', { ifExists: true })
+  },
+})
+
+let registry = createMigrationRegistry()
+registry.register({
+  id: '20260228090000',
+  name: 'create_users',
+  migration: createUsers,
+})
+
+let runner = createMigrationRunner({ adapter: db.adapter, migrations: registry })
+await runner.up()
+```
+
+For Node.js file-based discovery, use:
+
+```ts
+import { loadMigrationsFromDirectory } from 'remix/data-table/migrations/node'
+```
+
 ## Raw SQL Escape Hatch
 
 ```ts
