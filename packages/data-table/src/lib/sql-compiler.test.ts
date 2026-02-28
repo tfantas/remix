@@ -25,6 +25,12 @@ import {
   compileDataMigrationOperations,
   compileOperationToSql,
 } from './sql-compiler.ts'
+import {
+  mysqlCompilerOptions,
+  postgresCompilerOptions,
+  sqliteCompilerOptions,
+  sqliteCompilerOptionsWithRewrite,
+} from './sql-compiler-test-dialects.ts'
 import { createTable } from './table.ts'
 
 let accounts = createTable({
@@ -105,7 +111,7 @@ describe('shared sql compiler', () => {
         offset: 5,
       }
 
-      let compiled = compileDataManipulationOperation(operation, { dialect: 'postgres' })
+      let compiled = compileDataManipulationOperation(operation, postgresCompilerOptions)
 
       assert.match(compiled.text, /^select distinct /)
       assert.match(compiled.text, /"accounts"\.\* as "all_accounts"/)
@@ -158,7 +164,7 @@ describe('shared sql compiler', () => {
         orderBy: [],
       }
 
-      let compiled = compileDataManipulationOperation(operation, { dialect: 'postgres' })
+      let compiled = compileDataManipulationOperation(operation, postgresCompilerOptions)
 
       assert.deepEqual(compiled, {
         text: 'select * from "accounts"',
@@ -179,7 +185,7 @@ describe('shared sql compiler', () => {
         orderBy: [],
       }
 
-      let compiled = compileDataManipulationOperation(operation, { dialect: 'mysql' })
+      let compiled = compileDataManipulationOperation(operation, mysqlCompilerOptions)
 
       assert.equal(compiled.text, 'select * from `accounts` where (lower(`email`) like lower(?))')
       assert.deepEqual(compiled.values, ['%@example.com'])
@@ -196,7 +202,7 @@ describe('shared sql compiler', () => {
         returning: ['id'],
       }
 
-      let compiled = compileDataManipulationOperation(operation, { dialect: 'sqlite' })
+      let compiled = compileDataManipulationOperation(operation, sqliteCompilerOptions)
 
       assert.equal(
         compiled.text,
@@ -230,8 +236,8 @@ describe('shared sql compiler', () => {
         having: [],
       }
 
-      let countCompiled = compileDataManipulationOperation(countOperation, { dialect: 'postgres' })
-      let existsCompiled = compileDataManipulationOperation(existsOperation, { dialect: 'mysql' })
+      let countCompiled = compileDataManipulationOperation(countOperation, postgresCompilerOptions)
+      let existsCompiled = compileDataManipulationOperation(existsOperation, mysqlCompilerOptions)
 
       assert.match(countCompiled.text, /^select count\(\*\) as "count" from \(select 1 from "accounts"/)
       assert.match(countCompiled.text, /group by "accounts"\."id" having \("accounts"\."id" = \$2\)/)
@@ -269,13 +275,15 @@ describe('shared sql compiler', () => {
         returning: ['id'],
       }
 
-      let postgresInsert = compileDataManipulationOperation(insertOperation, { dialect: 'postgres' })
-      let postgresDefaultInsert = compileDataManipulationOperation(insertDefaultPostgres, {
-        dialect: 'postgres',
-      })
-      let mysqlDefaultInsert = compileDataManipulationOperation(insertDefaultMysql, {
-        dialect: 'mysql',
-      })
+      let postgresInsert = compileDataManipulationOperation(insertOperation, postgresCompilerOptions)
+      let postgresDefaultInsert = compileDataManipulationOperation(
+        insertDefaultPostgres,
+        postgresCompilerOptions,
+      )
+      let mysqlDefaultInsert = compileDataManipulationOperation(
+        insertDefaultMysql,
+        mysqlCompilerOptions,
+      )
 
       assert.deepEqual(postgresInsert, {
         text: 'insert into "accounts" ("id", "email") values ($1, $2) returning *',
@@ -323,16 +331,16 @@ describe('shared sql compiler', () => {
         values: [inheritedRow, { id: 10, email: 'b@example.com' }],
       }
 
-      let emptyCompiled = compileDataManipulationOperation(emptyOperation, { dialect: 'postgres' })
-      let defaultCompiled = compileDataManipulationOperation(defaultValuesOperation, {
-        dialect: 'postgres',
-      })
-      let sparseCompiled = compileDataManipulationOperation(sparseRowsOperation, {
-        dialect: 'sqlite',
-      })
-      let duplicateColumnRowsCompiled = compileDataManipulationOperation(duplicateColumnRowsOperation, {
-        dialect: 'mysql',
-      })
+      let emptyCompiled = compileDataManipulationOperation(emptyOperation, postgresCompilerOptions)
+      let defaultCompiled = compileDataManipulationOperation(
+        defaultValuesOperation,
+        postgresCompilerOptions,
+      )
+      let sparseCompiled = compileDataManipulationOperation(sparseRowsOperation, sqliteCompilerOptions)
+      let duplicateColumnRowsCompiled = compileDataManipulationOperation(
+        duplicateColumnRowsOperation,
+        mysqlCompilerOptions,
+      )
 
       assert.deepEqual(emptyCompiled, {
         text: 'select 0 where 1 = 0',
@@ -375,9 +383,9 @@ describe('shared sql compiler', () => {
         returning: '*',
       }
 
-      let postgresUpdate = compileDataManipulationOperation(updateOperation, { dialect: 'postgres' })
-      let mysqlUpdate = compileDataManipulationOperation(updateOperation, { dialect: 'mysql' })
-      let postgresDelete = compileDataManipulationOperation(deleteOperation, { dialect: 'postgres' })
+      let postgresUpdate = compileDataManipulationOperation(updateOperation, postgresCompilerOptions)
+      let mysqlUpdate = compileDataManipulationOperation(updateOperation, mysqlCompilerOptions)
+      let postgresDelete = compileDataManipulationOperation(deleteOperation, postgresCompilerOptions)
       let postgresUpdateWithoutReturning = compileDataManipulationOperation(
         {
           kind: 'update',
@@ -385,7 +393,7 @@ describe('shared sql compiler', () => {
           changes: { status: 'enabled' },
           where: [],
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
       let postgresDeleteReturningWildcardPath = compileDataManipulationOperation(
         {
@@ -394,7 +402,7 @@ describe('shared sql compiler', () => {
           where: [eq('id', 123)],
           returning: ['*'],
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       assert.equal(
@@ -430,8 +438,8 @@ describe('shared sql compiler', () => {
         update: {},
       }
 
-      let compiledWithUpdates = compileDataManipulationOperation(updateOperation, { dialect: 'mysql' })
-      let compiledNoOp = compileDataManipulationOperation(noOpOperation, { dialect: 'mysql' })
+      let compiledWithUpdates = compileDataManipulationOperation(updateOperation, mysqlCompilerOptions)
+      let compiledNoOp = compileDataManipulationOperation(noOpOperation, mysqlCompilerOptions)
 
       assert.equal(
         compiledWithUpdates.text,
@@ -472,8 +480,8 @@ describe('shared sql compiler', () => {
         returning: '*',
       }
 
-      let doNothing = compileDataManipulationOperation(doNothingOperation, { dialect: 'postgres' })
-      let doUpdate = compileDataManipulationOperation(doUpdateOperation, { dialect: 'postgres' })
+      let doNothing = compileDataManipulationOperation(doNothingOperation, postgresCompilerOptions)
+      let doUpdate = compileDataManipulationOperation(doUpdateOperation, postgresCompilerOptions)
 
       assert.equal(
         doNothing.text,
@@ -496,7 +504,7 @@ describe('shared sql compiler', () => {
       }
 
       assert.throws(
-        () => compileDataManipulationOperation(operation, { dialect: 'postgres' }),
+        () => compileDataManipulationOperation(operation, postgresCompilerOptions),
         /upsert requires at least one value/,
       )
     })
@@ -510,8 +518,8 @@ describe('shared sql compiler', () => {
         },
       }
 
-      let postgresCompiled = compileDataManipulationOperation(operation, { dialect: 'postgres' })
-      let mysqlCompiled = compileDataManipulationOperation(operation, { dialect: 'mysql' })
+      let postgresCompiled = compileDataManipulationOperation(operation, postgresCompilerOptions)
+      let mysqlCompiled = compileDataManipulationOperation(operation, mysqlCompilerOptions)
 
       assert.deepEqual(postgresCompiled, {
         text: 'select $1 as a, $2 as b',
@@ -531,7 +539,7 @@ describe('shared sql compiler', () => {
             values: [],
           },
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       assert.deepEqual(postgresWithoutPlaceholders, {
@@ -555,13 +563,13 @@ describe('shared sql compiler', () => {
               having: [],
               orderBy: [],
             },
-            { dialect: 'postgres' },
+            postgresCompilerOptions,
           ),
         /Unsupported predicate/,
       )
 
       assert.throws(
-        () => compileDataManipulationOperation({ kind: 'mystery' } as any, { dialect: 'postgres' }),
+        () => compileDataManipulationOperation({ kind: 'mystery' } as any, postgresCompilerOptions),
         /Unsupported statement kind/,
       )
     })
@@ -625,7 +633,7 @@ describe('shared sql compiler', () => {
         comment: `owner's table`,
       }
 
-      let statements = compileDataMigrationOperations(operation, { dialect: 'postgres' })
+      let statements = compileDataMigrationOperations(operation, postgresCompilerOptions)
 
       assert.equal(statements.length, 2)
       assert.match(statements[0].text, /^create table if not exists "app"\."users" \(/)
@@ -697,8 +705,8 @@ describe('shared sql compiler', () => {
         comment: 'widgets table',
       }
 
-      let mysqlStatements = compileDataMigrationOperations(operation, { dialect: 'mysql' })
-      let sqliteStatements = compileDataMigrationOperations(operation, { dialect: 'sqlite' })
+      let mysqlStatements = compileDataMigrationOperations(operation, mysqlCompilerOptions)
+      let sqliteStatements = compileDataMigrationOperations(operation, sqliteCompilerOptions)
 
       assert.equal(mysqlStatements.length, 2)
       assert.match(mysqlStatements[0].text, /`id` int unsigned auto_increment primary key/)
@@ -750,7 +758,7 @@ describe('shared sql compiler', () => {
       }
 
       assert.throws(
-        () => compileDataMigrationOperations(operation, { dialect: 'postgres' }),
+        () => compileDataMigrationOperations(operation, postgresCompilerOptions),
         /Postgres only supports stored computed\/generated columns/,
       )
     })
@@ -804,11 +812,12 @@ describe('shared sql compiler', () => {
         changes: [{ kind: 'setTableComment', comment: 'ignored' }],
       }
 
-      let postgresStatements = compileDataMigrationOperations(postgresOperation, {
-        dialect: 'postgres',
-      })
-      let mysqlStatements = compileDataMigrationOperations(mysqlOperation, { dialect: 'mysql' })
-      let sqliteStatements = compileDataMigrationOperations(sqliteOperation, { dialect: 'sqlite' })
+      let postgresStatements = compileDataMigrationOperations(
+        postgresOperation,
+        postgresCompilerOptions,
+      )
+      let mysqlStatements = compileDataMigrationOperations(mysqlOperation, mysqlCompilerOptions)
+      let sqliteStatements = compileDataMigrationOperations(sqliteOperation, sqliteCompilerOptions)
 
       assert.equal(postgresStatements.length, 13)
       assert.equal(
@@ -849,7 +858,7 @@ describe('shared sql compiler', () => {
           from: { schema: 'app', name: 'users' },
           to: { schema: 'app', name: 'accounts' },
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let mysqlRename = compileDataMigrationOperations(
@@ -858,7 +867,7 @@ describe('shared sql compiler', () => {
           from: { name: 'users' },
           to: { name: 'accounts' },
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       let postgresDrop = compileDataMigrationOperations(
@@ -868,7 +877,7 @@ describe('shared sql compiler', () => {
           ifExists: true,
           cascade: true,
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let mysqlDrop = compileDataMigrationOperations(
@@ -878,7 +887,7 @@ describe('shared sql compiler', () => {
           ifExists: true,
           cascade: true,
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       let postgresCreateIndex = compileDataMigrationOperations(
@@ -894,7 +903,7 @@ describe('shared sql compiler', () => {
             unique: true,
           },
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let mysqlCreateIndexDefaultName = compileDataMigrationOperations(
@@ -906,7 +915,7 @@ describe('shared sql compiler', () => {
             columns: ['email'],
           },
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       let sqliteCreateIndex = compileDataMigrationOperations(
@@ -918,7 +927,7 @@ describe('shared sql compiler', () => {
             columns: ['email'],
           },
         },
-        { dialect: 'sqlite' },
+        sqliteCompilerOptions,
       )
 
       let postgresDropIndex = compileDataMigrationOperations(
@@ -928,7 +937,7 @@ describe('shared sql compiler', () => {
           name: 'users_email_idx',
           ifExists: true,
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let mysqlDropIndex = compileDataMigrationOperations(
@@ -938,7 +947,7 @@ describe('shared sql compiler', () => {
           name: 'users_email_idx',
           ifExists: true,
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       let postgresRenameIndex = compileDataMigrationOperations(
@@ -948,7 +957,7 @@ describe('shared sql compiler', () => {
           from: 'users_email_idx',
           to: 'users_contact_email_idx',
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let mysqlRenameIndex = compileDataMigrationOperations(
@@ -958,7 +967,7 @@ describe('shared sql compiler', () => {
           from: 'users_email_idx',
           to: 'users_contact_email_idx',
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       assert.equal(
@@ -1005,7 +1014,7 @@ describe('shared sql compiler', () => {
             onUpdate: 'restrict',
           },
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let dropForeignKeyMysql = compileDataMigrationOperations(
@@ -1014,7 +1023,7 @@ describe('shared sql compiler', () => {
           table: { name: 'users' },
           name: 'users_account_fk',
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       let dropForeignKeyPostgres = compileDataMigrationOperations(
@@ -1023,7 +1032,7 @@ describe('shared sql compiler', () => {
           table: { name: 'users' },
           name: 'users_account_fk',
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let addCheck = compileDataMigrationOperations(
@@ -1035,7 +1044,7 @@ describe('shared sql compiler', () => {
             expression: 'char_length(email) > 3',
           },
         },
-        { dialect: 'sqlite' },
+        sqliteCompilerOptions,
       )
 
       let dropCheckMysql = compileDataMigrationOperations(
@@ -1044,7 +1053,7 @@ describe('shared sql compiler', () => {
           table: { name: 'users' },
           name: 'users_email_check',
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       let dropCheckPostgres = compileDataMigrationOperations(
@@ -1053,7 +1062,7 @@ describe('shared sql compiler', () => {
           table: { name: 'users' },
           name: 'users_email_check',
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       assert.equal(
@@ -1088,7 +1097,7 @@ describe('shared sql compiler', () => {
         },
       }
 
-      let rawCompiled = compileDataMigrationOperations(rawOperation, { dialect: 'sqlite' })
+      let rawCompiled = compileDataMigrationOperations(rawOperation, sqliteCompilerOptions)
 
       assert.deepEqual(rawCompiled, [{ text: 'vacuum', values: [1] }])
 
@@ -1098,16 +1107,13 @@ describe('shared sql compiler', () => {
           table: { name: 'users' },
           changes: [{ kind: 'setTableComment', comment: 'drop me' }],
         },
-        {
-          dialect: 'sqlite',
-          rewriteMigrationOperation(operation) {
-            if (operation.kind !== 'alterTable') {
-              return [operation]
-            }
+        sqliteCompilerOptionsWithRewrite((operation) => {
+          if (operation.kind !== 'alterTable') {
+            return [operation]
+          }
 
-            return []
-          },
-        },
+          return []
+        }),
       )
 
       assert.deepEqual(rewritten, [])
@@ -1115,7 +1121,7 @@ describe('shared sql compiler', () => {
 
     it('throws for unsupported migration operation kinds', () => {
       assert.throws(
-        () => compileDataMigrationOperations({ kind: 'unsupported' } as any, { dialect: 'postgres' }),
+        () => compileDataMigrationOperations({ kind: 'unsupported' } as any, postgresCompilerOptions),
         /Unsupported data migration operation kind/,
       )
     })
@@ -1130,7 +1136,7 @@ describe('shared sql compiler', () => {
           where: [eq('id', 1)],
           returning: ['id'],
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       let migration = compileOperationToSql(
@@ -1139,7 +1145,7 @@ describe('shared sql compiler', () => {
           table: { name: 'users' },
           ifExists: true,
         },
-        { dialect: 'mysql' },
+        mysqlCompilerOptions,
       )
 
       assert.deepEqual(manipulation, [
@@ -1166,7 +1172,7 @@ describe('shared sql compiler', () => {
             values: [1],
           },
         },
-        { dialect: 'postgres' },
+        postgresCompilerOptions,
       )
 
       assert.deepEqual(rawManipulation, [
@@ -1184,7 +1190,7 @@ describe('shared sql compiler', () => {
             values: [],
           },
         },
-        { dialect: 'sqlite' },
+        sqliteCompilerOptions,
       )
 
       assert.deepEqual(migrationRaw, [{ text: 'pragma optimize', values: [] }])
@@ -1201,7 +1207,7 @@ describe('shared sql compiler', () => {
         update: {},
       }
 
-      let compiled = compileDataManipulationOperation(operation, { dialect: 'mysql' })
+      let compiled = compileDataManipulationOperation(operation, mysqlCompilerOptions)
 
       assert.equal(
         compiled.text,
