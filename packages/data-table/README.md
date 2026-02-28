@@ -325,7 +325,7 @@ import path from 'node:path'
 import { Pool } from 'pg'
 import { createPostgresDatabaseAdapter } from 'remix/data-table-postgres'
 import { createMigrationRunner } from 'remix/data-table/migrations'
-import { loadMigrationsFromDirectory } from 'remix/data-table/migrations/node'
+import { loadMigrations } from 'remix/data-table/migrations/node'
 
 let directionArg = process.argv[2] ?? 'up'
 let direction = directionArg === 'down' ? 'down' : 'up'
@@ -333,7 +333,7 @@ let to = process.argv[3]
 
 let pool = new Pool({ connectionString: process.env.DATABASE_URL })
 let adapter = createPostgresDatabaseAdapter(pool)
-let migrations = await loadMigrationsFromDirectory(path.resolve('app/db/migrations'))
+let migrations = await loadMigrations(path.resolve('app/db/migrations'))
 let runner = createMigrationRunner(adapter, migrations)
 
 try {

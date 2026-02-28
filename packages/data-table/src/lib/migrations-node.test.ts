@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { loadMigrationsFromDirectory } from './migrations-node.ts'
+import { loadMigrations } from './migrations-node.ts'
 
 describe('migration node loader', () => {
   it('loads migrations and infers ids and names from filenames', async () => {
@@ -33,7 +33,7 @@ describe('migration node loader', () => {
         ].join('\n'),
       )
 
-      let migrations = await loadMigrationsFromDirectory(directory)
+      let migrations = await loadMigrations(directory)
 
       assert.equal(migrations.length, 2)
       assert.equal(migrations[0].id, '20260101000000')
@@ -62,7 +62,7 @@ describe('migration node loader', () => {
       )
 
       await assert.rejects(
-        () => loadMigrationsFromDirectory(directory),
+        () => loadMigrations(directory),
         /Expected format YYYYMMDDHHmmss_name\.ts/,
       )
     } finally {
@@ -96,7 +96,7 @@ describe('migration node loader', () => {
         ].join('\n'),
       )
 
-      await assert.rejects(() => loadMigrationsFromDirectory(directory), /Duplicate migration id/)
+      await assert.rejects(() => loadMigrations(directory), /Duplicate migration id/)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

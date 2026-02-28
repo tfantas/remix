@@ -1,1 +1,1 @@
-export { loadMigrationsFromDirectory } from '../lib/migrations-node.ts'
+export { loadMigrations } from '../lib/migrations-node.ts'

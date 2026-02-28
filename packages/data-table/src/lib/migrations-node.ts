@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import type { Migration, MigrationDescriptor } from './migrations.ts'
 import { parseMigrationFilename } from './migrations.ts'
 
-export async function loadMigrationsFromDirectory(directory: string): Promise<MigrationDescriptor[]> {
+export async function loadMigrations(directory: string): Promise<MigrationDescriptor[]> {
   let allFiles = (await fs.readdir(directory, { withFileTypes: true }))
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
