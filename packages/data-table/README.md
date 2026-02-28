@@ -323,7 +323,6 @@ export default createMigration({
 ```ts
 import path from 'node:path'
 import { Pool } from 'pg'
-import { createDatabase } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table-postgres'
 import { createMigrationRunner } from 'remix/data-table/migrations'
 import { loadMigrationsFromDirectory } from 'remix/data-table/migrations/node'
@@ -333,9 +332,9 @@ let direction = directionArg === 'down' ? 'down' : 'up'
 let to = process.argv[3]
 
 let pool = new Pool({ connectionString: process.env.DATABASE_URL })
-let db = createDatabase(createPostgresDatabaseAdapter(pool))
+let adapter = createPostgresDatabaseAdapter(pool)
 let migrations = await loadMigrationsFromDirectory(path.resolve('app/db/migrations'))
-let runner = createMigrationRunner({ adapter: db.adapter, migrations })
+let runner = createMigrationRunner({ adapter, migrations })
 
 try {
   let result = direction === 'up' ? await runner.up({ to }) : await runner.down({ to })
@@ -374,7 +373,8 @@ import createUsers from './db/migrations/20260228090000_create_users.ts'
 let registry = createMigrationRegistry()
 registry.register({ id: '20260228090000', name: 'create_users', migration: createUsers })
 
-let runner = createMigrationRunner({ adapter: db.adapter, migrations: registry })
+// adapter from createPostgresDatabaseAdapter/createMysqlDatabaseAdapter/createSqliteDatabaseAdapter
+let runner = createMigrationRunner({ adapter, migrations: registry })
 await runner.up()
 ```
 
