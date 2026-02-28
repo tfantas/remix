@@ -96,6 +96,7 @@ export type MigrateResult = {
 export type CreateTableOptions = { ifNotExists?: boolean }
 export type AlterTableOptions = { ifExists?: boolean }
 export type DropTableOptions = { ifExists?: boolean; cascade?: boolean }
+export type IndexColumns = string | string[]
 
 let migrationFilenamePattern = /^(\d{14})_(.+)\.(?:m?ts|m?js|cts|cjs)$/
 
@@ -112,6 +113,14 @@ function toTableRef(name: string): TableRef {
   }
 }
 
+function normalizeIndexColumns(columns: IndexColumns): string[] {
+  if (Array.isArray(columns)) {
+    return [...columns]
+  }
+
+  return [columns]
+}
+
 export interface CreateTableBuilder {
   addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
   addPrimaryKey(columns: string[], options?: { name?: string }): void
@@ -125,7 +134,7 @@ export interface CreateTableBuilder {
   addCheck(expression: string, options?: { name?: string }): void
   addIndex(
     name: string,
-    columns: string[],
+    columns: IndexColumns,
     options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
   ): void
   comment(text: string): void
@@ -151,7 +160,7 @@ export interface AlterTableBuilder {
   dropCheck(name: string): void
   addIndex(
     name: string,
-    columns: string[],
+    columns: IndexColumns,
     options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
   ): void
   dropIndex(name: string): void
@@ -173,7 +182,7 @@ export interface MigrationSchemaApi {
   dropTable(name: string, options?: DropTableOptions): Promise<void>
   createIndex(
     table: string,
-    columns: string[],
+    columns: IndexColumns,
     options?: Omit<IndexDefinition, 'table' | 'columns'>,
   ): Promise<void>
   dropIndex(table: string, name: string, options?: { ifExists?: boolean }): Promise<void>
@@ -485,12 +494,12 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
 
   addIndex(
     name: string,
-    columns: string[],
+    columns: IndexColumns,
     options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
   ): void {
     this.indexes.push({
       name,
-      columns: [...columns],
+      columns: normalizeIndexColumns(columns),
       ...options,
     })
   }
@@ -589,7 +598,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 
   addIndex(
     name: string,
-    columns: string[],
+    columns: IndexColumns,
     options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
   ): void {
     this.extraStatements.push({
@@ -597,7 +606,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
       index: {
         table: this.table,
         name,
-        columns: [...columns],
+        columns: normalizeIndexColumns(columns),
         ...options,
       },
     })
@@ -681,7 +690,7 @@ function createSchemaApi(
         kind: 'createIndex',
         index: {
           table: toTableRef(table),
-          columns: [...columns],
+          columns: normalizeIndexColumns(columns),
           ...options,
         },
       })

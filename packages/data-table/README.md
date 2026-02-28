@@ -309,7 +309,7 @@ export default createMigration({
       table.addColumn('id', c.integer().primaryKey())
       table.addColumn('email', c.varchar(255).notNull().unique())
       table.addColumn('created_at', c.timestamp({ withTimezone: true }).defaultNow())
-      table.addIndex('users_email_idx', ['email'], { unique: true })
+      table.addIndex('users_email_idx', 'email', { unique: true })
     })
   },
   async down({ schema }) {

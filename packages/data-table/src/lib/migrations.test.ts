@@ -223,14 +223,14 @@ describe('migration runner', () => {
         await schema.createTable('app.users', (table) => {
           table.addColumn('id', column.integer().primaryKey())
           table.addColumn('email', column.text().notNull())
-          table.addIndex('users_email_idx', ['email'], { unique: true })
+          table.addIndex('users_email_idx', 'email', { unique: true })
           table.comment('Users table')
         })
 
         await schema.alterTable('app.users', (table) => {
           table.addColumn('status', column.text().default('active'))
           table.addCheck("status in ('active', 'disabled')", { name: 'users_status_check' })
-          table.addIndex('users_status_idx', ['status'])
+          table.addIndex('users_status_idx', 'status')
         })
 
         await schema.renameIndex('app.users', 'users_status_idx', 'users_status_idx_v2')
@@ -251,6 +251,14 @@ describe('migration runner', () => {
     let createTableOperation = adapter.migratedOperations[0]
     assert.equal(createTableOperation.kind, 'createTable')
     assert.deepEqual(createTableOperation.table, { schema: 'app', name: 'users' })
+
+    let createIndexOperation = adapter.migratedOperations[1]
+    assert.equal(createIndexOperation.kind, 'createIndex')
+    assert.deepEqual(createIndexOperation.index.columns, ['email'])
+
+    let alterIndexOperation = adapter.migratedOperations[3]
+    assert.equal(alterIndexOperation.kind, 'createIndex')
+    assert.deepEqual(alterIndexOperation.index.columns, ['status'])
 
     let rawOperation = adapter.migratedOperations[5]
     assert.equal(rawOperation.kind, 'raw')
