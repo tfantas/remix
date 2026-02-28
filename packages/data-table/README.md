@@ -334,7 +334,7 @@ let to = process.argv[3]
 let pool = new Pool({ connectionString: process.env.DATABASE_URL })
 let adapter = createPostgresDatabaseAdapter(pool)
 let migrations = await loadMigrationsFromDirectory(path.resolve('app/db/migrations'))
-let runner = createMigrationRunner({ adapter, migrations })
+let runner = createMigrationRunner(adapter, migrations)
 
 try {
   let result = direction === 'up' ? await runner.up({ to }) : await runner.down({ to })
@@ -374,7 +374,7 @@ let registry = createMigrationRegistry()
 registry.register({ id: '20260228090000', name: 'create_users', migration: createUsers })
 
 // adapter from createPostgresDatabaseAdapter/createMysqlDatabaseAdapter/createSqliteDatabaseAdapter
-let runner = createMigrationRunner({ adapter, migrations: registry })
+let runner = createMigrationRunner(adapter, registry)
 await runner.up()
 ```
 

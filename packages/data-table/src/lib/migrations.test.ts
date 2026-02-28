@@ -239,10 +239,7 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner({
-      adapter,
-      migrations: [{ id: '20260101000000', name: 'users', migration }],
-    })
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
 
     await runner.up()
 
@@ -293,7 +290,7 @@ describe('migration runner', () => {
       },
     ]
 
-    let runner = createMigrationRunner({ adapter, migrations })
+    let runner = createMigrationRunner(adapter, migrations)
 
     await runner.up()
     let statusAfterUp = await runner.status()
@@ -328,10 +325,7 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner({
-      adapter,
-      migrations: [{ id: '20260101000000', name: 'users', migration }],
-    })
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
 
     let result = await runner.up({ dryRun: true })
 
@@ -351,31 +345,25 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner({
-      adapter,
-      migrations: [
-        {
-          id: '20260101000000',
-          name: 'users',
-          checksum: 'checksum_a',
-          migration: appliedMigration,
-        },
-      ],
-    })
+    let runner = createMigrationRunner(adapter, [
+      {
+        id: '20260101000000',
+        name: 'users',
+        checksum: 'checksum_a',
+        migration: appliedMigration,
+      },
+    ])
 
     await runner.up()
 
-    let driftedRunner = createMigrationRunner({
-      adapter,
-      migrations: [
-        {
-          id: '20260101000000',
-          name: 'users',
-          checksum: 'checksum_b',
-          migration: appliedMigration,
-        },
-      ],
-    })
+    let driftedRunner = createMigrationRunner(adapter, [
+      {
+        id: '20260101000000',
+        name: 'users',
+        checksum: 'checksum_b',
+        migration: appliedMigration,
+      },
+    ])
 
     await assert.rejects(() => driftedRunner.up(), /checksum drift detected/)
   })
@@ -393,10 +381,7 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner({
-      adapter,
-      migrations: [{ id: '20260101000000', name: 'users', migration }],
-    })
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
 
     await assert.rejects(() => runner.up(), /Forced migrate failure/)
     assert.equal(adapter.lockAcquireCount, 1)
@@ -417,10 +402,7 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner({
-      adapter,
-      migrations: [{ id: '20260101000000', name: 'users', migration }],
-    })
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
 
     await assert.rejects(() => runner.up(), /requires transactional DDL/)
   })
@@ -436,10 +418,7 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner({
-      adapter,
-      migrations: [{ id: '20260101000000', name: 'users', migration }],
-    })
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
 
     await assert.rejects(() => runner.up({ to: '99999999999999' }), /Unknown migration target/)
     await assert.rejects(() => runner.up({ step: 0 }), /positive integer/)

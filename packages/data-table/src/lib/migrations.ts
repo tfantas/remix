@@ -914,8 +914,6 @@ export function createMigrationRegistry(initial: MigrationDescriptor[] = []): Mi
 }
 
 export type MigrationRunnerOptions = {
-  adapter: DatabaseAdapter
-  migrations: MigrationDescriptor[] | MigrationRegistry
   tableName?: string
 }
 
@@ -925,7 +923,7 @@ export type MigrationRunner = {
   status(): Promise<MigrationStatusEntry[]>
 }
 
-function resolveMigrations(input: MigrationRunnerOptions['migrations']): MigrationDescriptor[] {
+function resolveMigrations(input: MigrationDescriptor[] | MigrationRegistry): MigrationDescriptor[] {
   if (Array.isArray(input)) {
     return sortMigrations(input)
   }
@@ -933,14 +931,18 @@ function resolveMigrations(input: MigrationRunnerOptions['migrations']): Migrati
   return input.list()
 }
 
-export function createMigrationRunner(options: MigrationRunnerOptions): MigrationRunner {
+export function createMigrationRunner(
+  adapter: DatabaseAdapter,
+  migrations: MigrationDescriptor[] | MigrationRegistry,
+  options: MigrationRunnerOptions = {},
+): MigrationRunner {
   let tableName = options.tableName ?? 'data_table_migrations'
 
   return {
     async up(runOptions: MigrateOptions = {}): Promise<MigrateResult> {
       return runMigrations({
-        adapter: options.adapter,
-        migrations: resolveMigrations(options.migrations),
+        adapter,
+        migrations: resolveMigrations(migrations),
         tableName,
         direction: 'up',
         options: runOptions,
@@ -948,21 +950,21 @@ export function createMigrationRunner(options: MigrationRunnerOptions): Migratio
     },
     async down(runOptions: MigrateOptions = {}): Promise<MigrateResult> {
       return runMigrations({
-        adapter: options.adapter,
-        migrations: resolveMigrations(options.migrations),
+        adapter,
+        migrations: resolveMigrations(migrations),
         tableName,
         direction: 'down',
         options: runOptions,
       })
     },
     async status(): Promise<MigrationStatusEntry[]> {
-      await ensureMigrationJournal(options.adapter, tableName)
+      await ensureMigrationJournal(adapter, tableName)
 
-      let journal = await loadJournalRows(options.adapter, tableName)
+      let journal = await loadJournalRows(adapter, tableName)
       let journalMap = new Map(journal.map((row) => [row.id, row]))
-      let migrations = resolveMigrations(options.migrations)
+      let sortedMigrations = resolveMigrations(migrations)
 
-      return migrations.map((migration) => {
+      return sortedMigrations.map((migration) => {
         let journalRow = journalMap.get(migration.id)
 
         if (!journalRow) {
