@@ -283,38 +283,99 @@ await db.transaction(async (tx) => {
 `data-table` includes a first-class migration system under `remix/data-table/migrations`.
 Migrations are adapter-driven: each adapter compiles and executes DDL through its own dialect.
 
-```ts
-import { createMigration, createMigrationRegistry, createMigrationRunner, column as c } from 'remix/data-table/migrations'
+### Typical Setup (Node.js)
 
-let createUsers = createMigration({
+```txt
+app/
+  db/
+    migrations/
+      20260228090000_create_users.ts
+      20260301113000_add_user_status.ts
+    migrate.ts
+```
+
+- Keep migration files in one directory (for example `app/db/migrations`).
+- Name each file as `YYYYMMDDHHmmss_name.ts` (or `.js`, `.mjs`, `.cjs`, `.cts`).
+- Each file must `default` export `createMigration(...)`; `id` and `name` are inferred from filename.
+
+### Migration File Example
+
+```ts
+import { createMigration, column as c } from 'remix/data-table/migrations'
+
+export default createMigration({
   async up({ schema }) {
     await schema.createTable('users', (table) => {
       table.addColumn('id', c.integer().primaryKey())
       table.addColumn('email', c.varchar(255).notNull().unique())
       table.addColumn('created_at', c.timestamp({ withTimezone: true }).defaultNow())
-      table.addIndex('users_email_idx', ['email'])
+      table.addIndex('users_email_idx', ['email'], { unique: true })
     })
   },
   async down({ schema }) {
     await schema.dropTable('users', { ifExists: true })
   },
 })
+```
+
+### Runner Script Example
+
+```ts
+import path from 'node:path'
+import { Pool } from 'pg'
+import { createDatabase } from 'remix/data-table'
+import { createPostgresDatabaseAdapter } from 'remix/data-table-postgres'
+import { createMigrationRunner } from 'remix/data-table/migrations'
+import { loadMigrationsFromDirectory } from 'remix/data-table/migrations/node'
+
+let directionArg = process.argv[2] ?? 'up'
+let direction = directionArg === 'down' ? 'down' : 'up'
+let to = process.argv[3]
+
+let pool = new Pool({ connectionString: process.env.DATABASE_URL })
+let db = createDatabase(createPostgresDatabaseAdapter(pool))
+let migrations = await loadMigrationsFromDirectory(path.resolve('app/db/migrations'))
+let runner = createMigrationRunner({ adapter: db.adapter, migrations })
+
+try {
+  let result = direction === 'up' ? await runner.up({ to }) : await runner.down({ to })
+  console.log(direction + ' complete', {
+    applied: result.applied.map((entry) => entry.id),
+    reverted: result.reverted.map((entry) => entry.id),
+  })
+} finally {
+  await pool.end()
+}
+```
+
+Run it with your runtime, for example:
+
+```sh
+tsx ./app/db/migrate.ts up
+tsx ./app/db/migrate.ts up 20260301113000
+tsx ./app/db/migrate.ts down
+tsx ./app/db/migrate.ts down 20260228090000
+# or run a compiled JavaScript build with node
+```
+
+Use `step` when you want bounded rollforward/rollback behavior instead of a target id:
+
+```ts
+await runner.up({ step: 1 })
+await runner.down({ step: 1 })
+```
+
+For non-filesystem runtimes, register migrations manually:
+
+```ts
+import { createMigrationRegistry, createMigrationRunner } from 'remix/data-table/migrations'
+import createUsers from './db/migrations/20260228090000_create_users.ts'
 
 let registry = createMigrationRegistry()
-registry.register({
-  id: '20260228090000',
-  name: 'create_users',
-  migration: createUsers,
-})
+registry.register({ id: '20260228090000', name: 'create_users', migration: createUsers })
 
 let runner = createMigrationRunner({ adapter: db.adapter, migrations: registry })
 await runner.up()
-```
-
-For Node.js file-based discovery, use:
-
-```ts
-import { loadMigrationsFromDirectory } from 'remix/data-table/migrations/node'
 ```
 
 ## Raw SQL Escape Hatch
