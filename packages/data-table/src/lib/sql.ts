@@ -1,5 +1,8 @@
 /**
- * Parameterized SQL payload with positional `?` placeholders.
+ * Parameterized SQL payload.
+ *
+ * The `text` may contain positional placeholders (`?`) or dialect-native
+ * placeholders (for example `$1`, `$2`) depending on compiler stage.
  */
 export type SqlStatement = {
   text: string
@@ -58,7 +61,7 @@ export function isSqlStatement(value: unknown): value is SqlStatement {
 
 /**
  * Creates a SQL statement from raw text and values.
- * @param text SQL text containing `?` placeholders.
+ * @param text SQL text containing placeholders expected by the target adapter.
  * @param values Placeholder values.
  * @returns A normalized SQL statement.
  */

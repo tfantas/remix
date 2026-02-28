@@ -1,14 +1,9 @@
 import { getTableName, getTablePrimaryKey } from '@remix-run/data-table'
-import type { DataManipulationOperation, Predicate } from '@remix-run/data-table'
+import type { DataManipulationOperation, Predicate, SqlStatement } from '@remix-run/data-table'
 
 type JoinClause = Extract<DataManipulationOperation, { kind: 'select' }>['joins'][number]
 type UpsertOperation = Extract<DataManipulationOperation, { kind: 'upsert' }>
 type OperationTable = Extract<DataManipulationOperation, { kind: 'select' }>['table']
-
-type CompiledSqlStatement = {
-  text: string
-  values: unknown[]
-}
 
 type CompileContext = {
   values: unknown[]
@@ -16,7 +11,7 @@ type CompileContext = {
 
 export function compileSqliteStatement(
   operation: DataManipulationOperation,
-): CompiledSqlStatement {
+): SqlStatement {
   if (operation.kind === 'raw') {
     return {
       text: operation.sql.text,
@@ -124,7 +119,7 @@ function compileInsertStatement(
   values: Record<string, unknown>,
   returning: '*' | string[] | undefined,
   context: CompileContext,
-): CompiledSqlStatement {
+): SqlStatement {
   let columns = Object.keys(values)
 
   if (columns.length === 0) {
@@ -157,7 +152,7 @@ function compileInsertManyStatement(
   rows: Record<string, unknown>[],
   returning: '*' | string[] | undefined,
   context: CompileContext,
-): CompiledSqlStatement {
+): SqlStatement {
   if (rows.length === 0) {
     return {
       text: 'select 0 where 1 = 0',
@@ -206,7 +201,7 @@ function compileInsertManyStatement(
 function compileUpsertStatement(
   operation: UpsertOperation,
   context: CompileContext,
-): CompiledSqlStatement {
+): SqlStatement {
   let insertColumns = Object.keys(operation.values)
   let conflictTarget = operation.conflictTarget ?? [...getTablePrimaryKey(operation.table)]
 
