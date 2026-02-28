@@ -72,7 +72,7 @@ This is the changelog for [`remix`](https://github.com/remix-run/remix/tree/main
 
 ## v3.0.0-alpha.1
 
-### Patch Changes
+### Pre-release Changes
 
 - Changed `@remix-run/*` peer dependencies to regular dependencies
 
