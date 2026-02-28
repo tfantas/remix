@@ -8,7 +8,43 @@ import type { Predicate } from './operators.ts'
 import { getTableName, getTablePrimaryKey } from './table.ts'
 import type { SqlStatement } from './sql.ts'
 
-export type SqlCompilerDialect = 'postgres' | 'mysql' | 'sqlite'
+export type SqlCompilerDialect = {
+  name: string
+  quoteIdentifier: (value: string) => string
+  quoteLiteral: (value: unknown) => string
+  placeholder: (index: number) => string
+  normalizeBoundValue: (value: unknown) => unknown
+  compileColumnType: (
+    definition: ColumnDefinition,
+    tools: { quoteLiteral: (value: unknown) => string },
+  ) => string
+  defaultInsertValuesClause: string
+  nowExpression: string
+  supportsReturning: boolean
+  supportsIlikeOperator: boolean
+  rewriteRawQuestionPlaceholders: boolean
+  upsertKind: 'onConflict' | 'onDuplicateKeyUpdate'
+  migration: {
+    createTableCommentStyle: 'none' | 'commentOnTable' | 'alterTableComment'
+    setTableCommentStyle: 'none' | 'commentOnTable' | 'alterTableComment'
+    changeColumnStyle: 'modifyColumn' | 'alterType'
+    dropColumnSupportsIfExists: boolean
+    addPrimaryKeyConstraintName: boolean
+    dropPrimaryKeyStyle: 'dropPrimaryKey' | 'dropConstraint'
+    dropUniqueStyle: 'dropIndex' | 'dropConstraint'
+    dropForeignKeyStyle: 'dropForeignKey' | 'dropConstraint'
+    dropCheckStyle: 'dropCheck' | 'dropConstraint'
+    renameTableStyle: 'renameTable' | 'alterTableRename'
+    dropTableSupportsCascade: boolean
+    createIndexSupportsIfNotExists: boolean
+    createIndexSupportsUsing: boolean
+    dropIndexStyle: 'dropIndex' | 'dropIndexOnTable'
+    renameIndexStyle: 'alterIndexRename' | 'alterTableRenameIndex'
+    computedColumnStyle: 'storedOnly' | 'storedOrVirtual'
+    virtualComputedKeyword: string
+    computedStoredOnlyError: string
+  }
+}
 
 export type SqlCompilerOptions = {
   dialect: SqlCompilerDialect
@@ -247,7 +283,7 @@ function compileUpsertOperation(operation: UpsertOperation, context: CompileCont
     throw new Error('upsert requires at least one value')
   }
 
-  if (context.dialect === 'mysql') {
+  if (context.dialect.upsertKind === 'onDuplicateKeyUpdate') {
     let updateValues = operation.update ?? operation.values
     let updateColumns = Object.keys(updateValues)
     let fallbackNoopColumn = getTablePrimaryKey(operation.table)[0]
@@ -288,7 +324,7 @@ function compileUpsertOperation(operation: UpsertOperation, context: CompileCont
 
   let insertPlaceholders: string[] | undefined
 
-  if (context.dialect === 'postgres') {
+  if (context.dialect.placeholder(1) !== '?') {
     insertPlaceholders = insertColumns.map((column) => pushValue(context, operation.values[column]))
   }
 
@@ -338,7 +374,7 @@ function compileRawManipulationStatement(
   statement: SqlStatement,
   dialect: SqlCompilerDialect,
 ): SqlStatement {
-  if (dialect !== 'postgres') {
+  if (!dialect.rewriteRawQuestionPlaceholders) {
     return {
       text: statement.text,
       values: [...statement.values],
@@ -354,7 +390,7 @@ function compileRawManipulationStatement(
 
   let index = 1
   let text = statement.text.replace(/\?/g, () => {
-    let placeholder = '$' + String(index)
+    let placeholder = dialect.placeholder(index)
     index += 1
     return placeholder
   })
@@ -447,7 +483,7 @@ function compileReturningClause(
   returning: '*' | string[] | undefined,
   dialect: SqlCompilerDialect,
 ): string {
-  if (dialect === 'mysql') {
+  if (!dialect.supportsReturning) {
     return ''
   }
 
@@ -463,11 +499,7 @@ function compileReturningClause(
 }
 
 function compileDefaultInsertValuesClause(dialect: SqlCompilerDialect): string {
-  if (dialect === 'mysql') {
-    return ' () values ()'
-  }
-
-  return ' default values'
+  return dialect.defaultInsertValuesClause
 }
 
 function compilePredicate(predicate: Predicate, context: CompileContext): string {
@@ -545,7 +577,7 @@ function compilePredicate(predicate: Predicate, context: CompileContext): string
     if (predicate.operator === 'ilike') {
       let comparisonValue = compileComparisonValue(predicate, context)
 
-      if (context.dialect === 'postgres') {
+      if (context.dialect.supportsIlikeOperator) {
         return column + ' ilike ' + comparisonValue
       }
 
@@ -610,20 +642,11 @@ function normalizeJoinType(type: string): string {
 
 function pushValue(context: CompileContext, value: unknown): string {
   context.values.push(normalizeBoundValue(context.dialect, value))
-
-  if (context.dialect === 'postgres') {
-    return '$' + String(context.values.length)
-  }
-
-  return '?'
+  return context.dialect.placeholder(context.values.length)
 }
 
 function normalizeBoundValue(dialect: SqlCompilerDialect, value: unknown): unknown {
-  if (dialect === 'sqlite' && typeof value === 'boolean') {
-    return value ? 1 : 0
-  }
-
-  return value
+  return dialect.normalizeBoundValue(value)
 }
 
 function collectColumns(rows: Record<string, unknown>[]): string[] {
@@ -727,24 +750,15 @@ function compileDataMigrationOperation(
     ]
 
     if (operation.comment) {
-      if (dialect === 'postgres') {
-        statements.push({
-          text:
-            'comment on table ' +
-            quoteTableRef(dialect, operation.table) +
-            ' is ' +
-            quoteLiteral(dialect, operation.comment),
-          values: [],
-        })
-      } else if (dialect === 'mysql') {
-        statements.push({
-          text:
-            'alter table ' +
-            quoteTableRef(dialect, operation.table) +
-            ' comment = ' +
-            quoteLiteral(dialect, operation.comment),
-          values: [],
-        })
+      let tableCommentStatement = compileTableComment(
+        dialect,
+        operation.table,
+        operation.comment,
+        dialect.migration.createTableCommentStyle,
+      )
+
+      if (tableCommentStatement) {
+        statements.push(tableCommentStatement)
       }
     }
 
@@ -764,7 +778,7 @@ function compileDataMigrationOperation(
           ' ' +
           compileColumn(dialect, change.definition)
       } else if (change.kind === 'changeColumn') {
-        if (dialect === 'mysql') {
+        if (dialect.migration.changeColumnStyle === 'modifyColumn') {
           sql +=
             'modify column ' +
             quoteIdentifier(dialect, change.column) +
@@ -786,10 +800,10 @@ function compileDataMigrationOperation(
       } else if (change.kind === 'dropColumn') {
         sql +=
           'drop column ' +
-          (dialect === 'postgres' && change.ifExists ? 'if exists ' : '') +
+          (dialect.migration.dropColumnSupportsIfExists && change.ifExists ? 'if exists ' : '') +
           quoteIdentifier(dialect, change.column)
       } else if (change.kind === 'addPrimaryKey') {
-        if (dialect === 'postgres') {
+        if (dialect.migration.addPrimaryKeyConstraintName) {
           sql +=
             'add ' +
             (change.constraint.name
@@ -805,7 +819,7 @@ function compileDataMigrationOperation(
             ')'
         }
       } else if (change.kind === 'dropPrimaryKey') {
-        if (dialect === 'postgres') {
+        if (dialect.migration.dropPrimaryKeyStyle === 'dropConstraint') {
           sql += 'drop constraint ' + quoteIdentifier(dialect, change.name ?? 'PRIMARY')
         } else {
           sql += 'drop primary key'
@@ -820,7 +834,7 @@ function compileDataMigrationOperation(
           change.constraint.columns.map((column) => quoteIdentifier(dialect, column)).join(', ') +
           ')'
       } else if (change.kind === 'dropUnique') {
-        if (dialect === 'mysql') {
+        if (dialect.migration.dropUniqueStyle === 'dropIndex') {
           sql += 'drop index ' + quoteIdentifier(dialect, change.name)
         } else {
           sql += 'drop constraint ' + quoteIdentifier(dialect, change.name)
@@ -841,7 +855,7 @@ function compileDataMigrationOperation(
             .join(', ') +
           ')'
       } else if (change.kind === 'dropForeignKey') {
-        if (dialect === 'mysql') {
+        if (dialect.migration.dropForeignKeyStyle === 'dropForeignKey') {
           sql += 'drop foreign key ' + quoteIdentifier(dialect, change.name)
         } else {
           sql += 'drop constraint ' + quoteIdentifier(dialect, change.name)
@@ -856,24 +870,21 @@ function compileDataMigrationOperation(
           change.constraint.expression +
           ')'
       } else if (change.kind === 'dropCheck') {
-        if (dialect === 'mysql') {
+        if (dialect.migration.dropCheckStyle === 'dropCheck') {
           sql += 'drop check ' + quoteIdentifier(dialect, change.name)
         } else {
           sql += 'drop constraint ' + quoteIdentifier(dialect, change.name)
         }
       } else if (change.kind === 'setTableComment') {
-        if (dialect === 'postgres') {
-          statements.push({
-            text:
-              'comment on table ' +
-              quoteTableRef(dialect, operation.table) +
-              ' is ' +
-              quoteLiteral(dialect, change.comment),
-            values: [],
-          })
-        } else if (dialect === 'mysql') {
-          sql += 'comment = ' + quoteLiteral(dialect, change.comment)
-          statements.push({ text: sql, values: [] })
+        let tableCommentStatement = compileTableComment(
+          dialect,
+          operation.table,
+          change.comment,
+          dialect.migration.setTableCommentStyle,
+        )
+
+        if (tableCommentStatement) {
+          statements.push(tableCommentStatement)
         }
 
         continue
@@ -888,7 +899,7 @@ function compileDataMigrationOperation(
   }
 
   if (operation.kind === 'renameTable') {
-    if (dialect === 'mysql') {
+    if (dialect.migration.renameTableStyle === 'renameTable') {
       return [
         {
           text:
@@ -920,7 +931,7 @@ function compileDataMigrationOperation(
           'drop table ' +
           (operation.ifExists ? 'if exists ' : '') +
           quoteTableRef(dialect, operation.table) +
-          (dialect === 'postgres' && operation.cascade ? ' cascade' : ''),
+          (dialect.migration.dropTableSupportsCascade && operation.cascade ? ' cascade' : ''),
         values: [],
       },
     ]
@@ -933,13 +944,13 @@ function compileDataMigrationOperation(
           'create ' +
           (operation.index.unique ? 'unique ' : '') +
           'index ' +
-          ((dialect === 'postgres' || dialect === 'sqlite') && operation.ifNotExists
+          (dialect.migration.createIndexSupportsIfNotExists && operation.ifNotExists
             ? 'if not exists '
             : '') +
           quoteIdentifier(dialect, operation.index.name ?? defaultIndexName(operation.index.columns)) +
           ' on ' +
           quoteTableRef(dialect, operation.index.table) +
-          ((dialect === 'postgres' || dialect === 'mysql') && operation.index.using
+          (dialect.migration.createIndexSupportsUsing && operation.index.using
             ? ' using ' + operation.index.using
             : '') +
           ' (' +
@@ -952,7 +963,7 @@ function compileDataMigrationOperation(
   }
 
   if (operation.kind === 'dropIndex') {
-    if (dialect === 'mysql') {
+    if (dialect.migration.dropIndexStyle === 'dropIndexOnTable') {
       return [
         {
           text:
@@ -977,7 +988,7 @@ function compileDataMigrationOperation(
   }
 
   if (operation.kind === 'renameIndex') {
-    if (dialect === 'postgres') {
+    if (dialect.migration.renameIndexStyle === 'alterIndexRename') {
       return [
         {
           text:
@@ -1036,7 +1047,9 @@ function compileDataMigrationOperation(
         text:
           'alter table ' +
           quoteTableRef(dialect, operation.table) +
-          (dialect === 'mysql' ? ' drop foreign key ' : ' drop constraint ') +
+          (dialect.migration.dropForeignKeyStyle === 'dropForeignKey'
+            ? ' drop foreign key '
+            : ' drop constraint ') +
           quoteIdentifier(dialect, operation.name),
         values: [],
       },
@@ -1067,7 +1080,7 @@ function compileDataMigrationOperation(
         text:
           'alter table ' +
           quoteTableRef(dialect, operation.table) +
-          (dialect === 'mysql' ? ' drop check ' : ' drop constraint ') +
+          (dialect.migration.dropCheckStyle === 'dropCheck' ? ' drop check ' : ' drop constraint ') +
           quoteIdentifier(dialect, operation.name),
         values: [],
       },
@@ -1086,7 +1099,7 @@ function compileColumn(dialect: SqlCompilerDialect, definition: ColumnDefinition
 
   if (definition.default) {
     if (definition.default.kind === 'now') {
-      parts.push('default ' + (dialect === 'postgres' ? 'now()' : 'current_timestamp'))
+      parts.push('default ' + dialect.nowExpression)
     } else if (definition.default.kind === 'sql') {
       parts.push('default ' + definition.default.expression)
     } else {
@@ -1094,7 +1107,7 @@ function compileColumn(dialect: SqlCompilerDialect, definition: ColumnDefinition
     }
   }
 
-  if (dialect === 'mysql' && definition.autoIncrement) {
+  if (dialect.migration.changeColumnStyle === 'modifyColumn' && definition.autoIncrement) {
     parts.push('auto_increment')
   }
 
@@ -1107,15 +1120,15 @@ function compileColumn(dialect: SqlCompilerDialect, definition: ColumnDefinition
   }
 
   if (definition.computed) {
-    if (dialect === 'postgres') {
+    if (dialect.migration.computedColumnStyle === 'storedOnly') {
       if (!definition.computed.stored) {
-        throw new Error('Postgres only supports stored computed/generated columns')
+        throw new Error(dialect.migration.computedStoredOnlyError)
       }
 
       parts.push('generated always as (' + definition.computed.expression + ') stored')
     } else {
       parts.push('generated always as (' + definition.computed.expression + ')')
-      parts.push(definition.computed.stored ? 'stored' : 'virtual')
+      parts.push(definition.computed.stored ? 'stored' : dialect.migration.virtualComputedKeyword)
     }
   }
 
@@ -1148,205 +1161,15 @@ function compileColumn(dialect: SqlCompilerDialect, definition: ColumnDefinition
 }
 
 function compileColumnType(dialect: SqlCompilerDialect, definition: ColumnDefinition): string {
-  if (dialect === 'postgres') {
-    return compilePostgresColumnType(definition)
-  }
-
-  if (dialect === 'mysql') {
-    return compileMysqlColumnType(definition)
-  }
-
-  return compileSqliteColumnType(definition)
-}
-
-function compilePostgresColumnType(definition: ColumnDefinition): string {
-  if (definition.type === 'varchar') {
-    return 'varchar(' + String(definition.length ?? 255) + ')'
-  }
-
-  if (definition.type === 'text') {
-    return 'text'
-  }
-
-  if (definition.type === 'integer') {
-    return 'integer'
-  }
-
-  if (definition.type === 'bigint') {
-    return 'bigint'
-  }
-
-  if (definition.type === 'decimal') {
-    if (definition.precision !== undefined && definition.scale !== undefined) {
-      return 'decimal(' + String(definition.precision) + ', ' + String(definition.scale) + ')'
-    }
-
-    return 'decimal'
-  }
-
-  if (definition.type === 'boolean') {
-    return 'boolean'
-  }
-
-  if (definition.type === 'uuid') {
-    return 'uuid'
-  }
-
-  if (definition.type === 'date') {
-    return 'date'
-  }
-
-  if (definition.type === 'time') {
-    return definition.withTimezone ? 'time with time zone' : 'time without time zone'
-  }
-
-  if (definition.type === 'timestamp') {
-    return definition.withTimezone
-      ? 'timestamp with time zone'
-      : 'timestamp without time zone'
-  }
-
-  if (definition.type === 'json') {
-    return 'jsonb'
-  }
-
-  if (definition.type === 'binary') {
-    return 'bytea'
-  }
-
-  if (definition.type === 'enum') {
-    return 'text'
-  }
-
-  return 'text'
-}
-
-function compileMysqlColumnType(definition: ColumnDefinition): string {
-  if (definition.type === 'varchar') {
-    return 'varchar(' + String(definition.length ?? 255) + ')'
-  }
-
-  if (definition.type === 'text') {
-    return 'text'
-  }
-
-  if (definition.type === 'integer') {
-    return definition.unsigned ? 'int unsigned' : 'int'
-  }
-
-  if (definition.type === 'bigint') {
-    return definition.unsigned ? 'bigint unsigned' : 'bigint'
-  }
-
-  if (definition.type === 'decimal') {
-    if (definition.precision !== undefined && definition.scale !== undefined) {
-      return 'decimal(' + String(definition.precision) + ', ' + String(definition.scale) + ')'
-    }
-
-    return 'decimal'
-  }
-
-  if (definition.type === 'boolean') {
-    return 'boolean'
-  }
-
-  if (definition.type === 'uuid') {
-    return 'char(36)'
-  }
-
-  if (definition.type === 'date') {
-    return 'date'
-  }
-
-  if (definition.type === 'time') {
-    return 'time'
-  }
-
-  if (definition.type === 'timestamp') {
-    return 'timestamp'
-  }
-
-  if (definition.type === 'json') {
-    return 'json'
-  }
-
-  if (definition.type === 'binary') {
-    return 'blob'
-  }
-
-  if (definition.type === 'enum') {
-    if (definition.enumValues && definition.enumValues.length > 0) {
-      return 'enum(' + definition.enumValues.map((value) => quoteLiteral('mysql', value)).join(', ') + ')'
-    }
-
-    return 'text'
-  }
-
-  return 'text'
-}
-
-function compileSqliteColumnType(definition: ColumnDefinition): string {
-  if (definition.type === 'varchar') {
-    return 'text'
-  }
-
-  if (definition.type === 'text') {
-    return 'text'
-  }
-
-  if (definition.type === 'integer') {
-    return 'integer'
-  }
-
-  if (definition.type === 'bigint') {
-    return 'integer'
-  }
-
-  if (definition.type === 'decimal') {
-    return 'numeric'
-  }
-
-  if (definition.type === 'boolean') {
-    return 'integer'
-  }
-
-  if (definition.type === 'uuid') {
-    return 'text'
-  }
-
-  if (definition.type === 'date') {
-    return 'text'
-  }
-
-  if (definition.type === 'time') {
-    return 'text'
-  }
-
-  if (definition.type === 'timestamp') {
-    return 'text'
-  }
-
-  if (definition.type === 'json') {
-    return 'text'
-  }
-
-  if (definition.type === 'binary') {
-    return 'blob'
-  }
-
-  if (definition.type === 'enum') {
-    return 'text'
-  }
-
-  return 'text'
+  return dialect.compileColumnType(definition, {
+    quoteLiteral(value) {
+      return quoteLiteral(dialect, value)
+    },
+  })
 }
 
 function quoteIdentifier(dialect: SqlCompilerDialect, value: string): string {
-  if (dialect === 'mysql') {
-    return '`' + value.replace(/`/g, '``') + '`'
-  }
-
-  return '"' + value.replace(/"/g, '""') + '"'
+  return dialect.quoteIdentifier(value)
 }
 
 function quotePath(dialect: SqlCompilerDialect, path: string): string {
@@ -1375,27 +1198,30 @@ function quoteTableRef(dialect: SqlCompilerDialect, table: TableRef): string {
 }
 
 function quoteLiteral(dialect: SqlCompilerDialect, value: unknown): string {
-  if (value === null) {
-    return 'null'
+  return dialect.quoteLiteral(value)
+}
+
+function compileTableComment(
+  dialect: SqlCompilerDialect,
+  table: TableRef,
+  comment: string,
+  style: SqlCompilerDialect['migration']['createTableCommentStyle'],
+): SqlStatement | undefined {
+  if (style === 'none') {
+    return undefined
   }
 
-  if (typeof value === 'number' || typeof value === 'bigint') {
-    return String(value)
-  }
-
-  if (typeof value === 'boolean') {
-    if (dialect === 'sqlite') {
-      return value ? '1' : '0'
+  if (style === 'commentOnTable') {
+    return {
+      text: 'comment on table ' + quoteTableRef(dialect, table) + ' is ' + quoteLiteral(dialect, comment),
+      values: [],
     }
-
-    return value ? 'true' : 'false'
   }
 
-  if (value instanceof Date) {
-    return quoteLiteral(dialect, value.toISOString())
+  return {
+    text: 'alter table ' + quoteTableRef(dialect, table) + ' comment = ' + quoteLiteral(dialect, comment),
+    values: [],
   }
-
-  return "'" + String(value).replace(/'/g, "''") + "'"
 }
 
 function defaultIndexName(columns: string[]): string {
