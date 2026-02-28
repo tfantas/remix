@@ -364,6 +364,19 @@ await runner.up({ step: 1 })
 await runner.down({ step: 1 })
 ```
 
+Use `dryRun` to compile and inspect the SQL plan without applying migrations:
+
+```ts
+let dryRunResult = await runner.up({ dryRun: true })
+console.log(dryRunResult.sql)
+```
+
+This is useful when you want to:
+
+- Review generated SQL in CI before deploying
+- Verify migration ordering and target/step selection
+- Audit dialect-specific SQL differences across adapters
+
 For non-filesystem runtimes, register migrations manually:
 
 ```ts
