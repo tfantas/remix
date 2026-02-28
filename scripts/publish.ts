@@ -21,7 +21,12 @@ import * as cp from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { tagExists } from './utils/git.ts'
+import {
+  findVersionIntroductionCommit,
+  getLocalTagTarget,
+  getRemoteTagTarget,
+  tagExists,
+} from './utils/git.ts'
 import { createRelease, releaseExists } from './utils/github.ts'
 import { getRootDir, logAndExec } from './utils/process.ts'
 import { readChangesConfig, getChangelogEntry } from './utils/changes.ts'
@@ -29,6 +34,7 @@ import {
   getAllPackageDirNames,
   getPackageFile,
   getGitTag,
+  packageNameToDirectoryName,
   getPackageShortName,
 } from './utils/packages.ts'
 import { readJson, fileExists } from './utils/fs.ts'
@@ -56,6 +62,11 @@ interface LocalPackage {
   dirName: string
   npmName: string
   localVersion: string
+}
+
+interface TagPlan {
+  pkg: PublishedPackage
+  targetCommit: string
 }
 
 /**
@@ -236,6 +247,95 @@ function dedupePublishedPackages(packages: PublishedPackage[]): PublishedPackage
   return deduped
 }
 
+function isShallowRepository(): boolean {
+  try {
+    let output = cp.execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+      stdio: 'pipe',
+      encoding: 'utf-8',
+    })
+    return output.trim() === 'true'
+  } catch {
+    return false
+  }
+}
+
+function ensureGitHistoryForVersionLookup() {
+  if (isShallowRepository()) {
+    console.log('\nRepository is shallow, fetching full history for release tag anchoring...')
+    logAndExec('git fetch --unshallow --tags origin')
+    return
+  }
+
+  console.log('\nFetching tags from origin...')
+  logAndExec('git fetch --tags origin')
+}
+
+function resolveTagPlans(packages: PublishedPackage[]): TagPlan[] {
+  let plans: TagPlan[] = []
+
+  for (let pkg of packages) {
+    let packageDirName = packageNameToDirectoryName(pkg.packageName)
+    if (packageDirName === null) {
+      throw new Error(
+        `Could not map package "${pkg.packageName}" to a workspace directory for tag anchoring.`,
+      )
+    }
+
+    let packageJsonPath = path
+      .relative(rootDir, getPackageFile(packageDirName, 'package.json'))
+      .replaceAll('\\', '/')
+
+    let targetCommit = findVersionIntroductionCommit(packageJsonPath, pkg.version)
+    if (targetCommit === null) {
+      throw new Error(
+        `Could not find commit that introduced ${pkg.packageName}@${pkg.version} from ${packageJsonPath}. Ensure full git history is available.`,
+      )
+    }
+
+    plans.push({ pkg, targetCommit })
+  }
+
+  return plans
+}
+
+function verifyTagTargets(tagPlans: TagPlan[]) {
+  let mismatches: Array<{ tag: string; scope: 'local' | 'remote'; actual: string; expected: string }> =
+    []
+
+  for (let plan of tagPlans) {
+    let localTarget = getLocalTagTarget(plan.pkg.tag)
+    if (localTarget !== null && localTarget !== plan.targetCommit) {
+      mismatches.push({
+        tag: plan.pkg.tag,
+        scope: 'local',
+        actual: localTarget,
+        expected: plan.targetCommit,
+      })
+    }
+
+    let remoteTarget = getRemoteTagTarget(plan.pkg.tag)
+    if (remoteTarget !== null && remoteTarget !== plan.targetCommit) {
+      mismatches.push({
+        tag: plan.pkg.tag,
+        scope: 'remote',
+        actual: remoteTarget,
+        expected: plan.targetCommit,
+      })
+    }
+  }
+
+  if (mismatches.length > 0) {
+    let lines = ['Detected existing tags pointing at unexpected commits:']
+    for (let mismatch of mismatches) {
+      lines.push(
+        `  • ${mismatch.tag} (${mismatch.scope}) expected ${mismatch.expected.slice(0, 12)} but found ${mismatch.actual.slice(0, 12)}`,
+      )
+    }
+    lines.push('Refusing to continue to avoid creating inconsistent release metadata.')
+    throw new Error(lines.join('\n'))
+  }
+}
+
 interface ChangelogWarning {
   packageName: string
   version: string
@@ -413,30 +513,61 @@ async function main() {
     return
   }
 
+  ensureGitHistoryForVersionLookup()
+
+  console.log('\nResolving release tag targets...')
+  let tagPlans = resolveTagPlans(packagesNeedingTagsOrReleases)
+
+  for (let plan of tagPlans) {
+    console.log(`  • ${plan.pkg.tag} -> ${plan.targetCommit.slice(0, 12)}`)
+  }
+
+  verifyTagTargets(tagPlans)
+
   // Configure git
   console.log('\nConfiguring git...')
   logAndExec('git config user.name "Remix Run Bot"')
   logAndExec('git config user.email "hello@remix.run"')
 
   // Create tags (skip if already exist)
-  console.log(
-    `\nCreating tag${packagesNeedingTagsOrReleases.length === 1 ? '' : 's'} for published packages...`,
-  )
-  let tagsCreated = 0
-  for (let pkg of packagesNeedingTagsOrReleases) {
-    if (tagExists(pkg.tag)) {
-      console.log(`  ⊘ ${pkg.tag} (already exists)`)
-    } else {
-      cp.execSync(`git tag ${pkg.tag}`)
-      console.log(`  ✓ ${pkg.tag}`)
-      tagsCreated++
+  console.log(`\nCreating tag${tagPlans.length === 1 ? '' : 's'} for published packages...`)
+  let createdTags: TagPlan[] = []
+  for (let plan of tagPlans) {
+    let localTarget = getLocalTagTarget(plan.pkg.tag)
+    let remoteTarget = getRemoteTagTarget(plan.pkg.tag)
+
+    if (localTarget !== null || remoteTarget !== null) {
+      let existingTarget = localTarget ?? remoteTarget
+      console.log(`  ⊘ ${plan.pkg.tag} (already exists at ${existingTarget?.slice(0, 12)})`)
+      continue
     }
+
+    cp.execFileSync('git', ['tag', plan.pkg.tag, plan.targetCommit], { stdio: 'pipe' })
+    console.log(`  ✓ ${plan.pkg.tag} -> ${plan.targetCommit.slice(0, 12)}`)
+    createdTags.push(plan)
   }
 
   // Push tags if any were created
-  if (tagsCreated > 0) {
-    console.log(`\nPushing tag${tagsCreated === 1 ? '' : 's'}...`)
-    logAndExec('git push --tags')
+  if (createdTags.length > 0) {
+    console.log(`\nPushing tag${createdTags.length === 1 ? '' : 's'}...`)
+    for (let plan of createdTags) {
+      let ref = `refs/tags/${plan.pkg.tag}`
+      process.stdout.write(`  $ git push origin ${ref}\n`)
+      try {
+        cp.execFileSync('git', ['push', 'origin', ref], { stdio: 'inherit' })
+      } catch {
+        let remoteTarget = getRemoteTagTarget(plan.pkg.tag)
+        if (remoteTarget === plan.targetCommit) {
+          console.log(
+            `  ⊘ ${plan.pkg.tag} (already exists remotely at ${plan.targetCommit.slice(0, 12)})`,
+          )
+          continue
+        }
+        throw new Error(
+          `Failed to push ${plan.pkg.tag}, and remote target does not match expected commit ${plan.targetCommit.slice(0, 12)}.`,
+        )
+      }
+    }
   } else {
     console.log('\nNo new tags to push.')
   }
