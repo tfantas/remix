@@ -93,7 +93,13 @@ export function getLocalTagTarget(tag: string): string | null {
  */
 export function getRemoteTagTarget(tag: string): string | null {
   try {
-    let output = execGit(['ls-remote', '--tags', 'origin', `refs/tags/${tag}`, `refs/tags/${tag}^{}`])
+    let output = execGit([
+      'ls-remote',
+      '--tags',
+      'origin',
+      `refs/tags/${tag}`,
+      `refs/tags/${tag}^{}`,
+    ])
     let lines = output.split('\n').filter((line) => line.length > 0)
     if (lines.length === 0) {
       return null

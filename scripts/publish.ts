@@ -299,8 +299,12 @@ function resolveTagPlans(packages: PublishedPackage[]): TagPlan[] {
 }
 
 function verifyTagTargets(tagPlans: TagPlan[]) {
-  let mismatches: Array<{ tag: string; scope: 'local' | 'remote'; actual: string; expected: string }> =
-    []
+  let mismatches: Array<{
+    tag: string
+    scope: 'local' | 'remote'
+    actual: string
+    expected: string
+  }> = []
 
   for (let plan of tagPlans) {
     let localTarget = getLocalTagTarget(plan.pkg.tag)
