@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import { boolean, number, string } from '@remix-run/data-schema'
 
-import type { AdapterStatement, DatabaseAdapter } from './adapter.ts'
+import type { DataManipulationStatement, DatabaseAdapter } from './adapter.ts'
 import { createDatabase } from './database.ts'
 import { DataTableAdapterError, DataTableQueryError, DataTableValidationError } from './errors.ts'
 import { belongsTo, createTable, hasMany, hasManyThrough, hasOne, timestamps } from './table.ts'
@@ -432,11 +432,13 @@ describe('query builder', () => {
         returning: true,
         savepoints: true,
         upsert: true,
+        transactionalDdl: false,
+        migrationLock: false,
       },
       async execute(request) {
-        statementKinds.push(request.statement.kind)
+        statementKinds.push(request.operation.kind)
 
-        if (request.statement.kind === 'update') {
+        if (request.operation.kind === 'update') {
           return {
             rows: [
               {
@@ -449,7 +451,13 @@ describe('query builder', () => {
           }
         }
 
-        throw new Error('unexpected statement kind: ' + request.statement.kind)
+        throw new Error('unexpected statement kind: ' + request.operation.kind)
+      },
+      compileSql() {
+        return []
+      },
+      async migrate() {
+        return {}
       },
       async beginTransaction() {
         return { id: 'tx_1' }
@@ -477,17 +485,19 @@ describe('query builder', () => {
         returning: false,
         savepoints: true,
         upsert: true,
+        transactionalDdl: false,
+        migrationLock: false,
       },
       async execute(request) {
-        statementKinds.push(request.statement.kind)
+        statementKinds.push(request.operation.kind)
 
-        if (request.statement.kind === 'update') {
+        if (request.operation.kind === 'update') {
           return {
             affectedRows: 0,
           }
         }
 
-        if (request.statement.kind === 'select') {
+        if (request.operation.kind === 'select') {
           return {
             rows: [
               {
@@ -499,7 +509,13 @@ describe('query builder', () => {
           }
         }
 
-        throw new Error('unexpected statement kind: ' + request.statement.kind)
+        throw new Error('unexpected statement kind: ' + request.operation.kind)
+      },
+      compileSql() {
+        return []
+      },
+      async migrate() {
+        return {}
       },
       async beginTransaction() {
         return { id: 'tx_1' }
@@ -724,7 +740,7 @@ describe('query builder', () => {
   })
 
   it('supports insertMany() batches that include at least one explicit value', async () => {
-    let statements: AdapterStatement[] = []
+    let statements: DataManipulationStatement[] = []
 
     let adapter: DatabaseAdapter = {
       dialect: 'fake',
@@ -732,16 +748,24 @@ describe('query builder', () => {
         returning: true,
         savepoints: true,
         upsert: true,
+        transactionalDdl: false,
+        migrationLock: false,
       },
       async execute(request) {
-        statements.push(request.statement)
+        statements.push(request.operation)
 
-        if (request.statement.kind === 'insertMany') {
+        if (request.operation.kind === 'insertMany') {
           return {
-            affectedRows: request.statement.values.length,
+            affectedRows: request.operation.values.length,
           }
         }
 
+        return {}
+      },
+      compileSql() {
+        return []
+      },
+      async migrate() {
         return {}
       },
       async beginTransaction() {
@@ -1480,9 +1504,17 @@ describe('adapter errors', () => {
         returning: true,
         savepoints: true,
         upsert: true,
+        transactionalDdl: false,
+        migrationLock: false,
       },
       async execute() {
         throw new Error('boom')
+      },
+      compileSql() {
+        return []
+      },
+      async migrate() {
+        return {}
       },
       async beginTransaction() {
         tokens += 1

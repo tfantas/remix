@@ -2,7 +2,7 @@ import { parseSafe } from '@remix-run/data-schema'
 import type { Schema } from '@remix-run/data-schema'
 
 import type {
-  AdapterResult,
+  DataManipulationResult,
   CountStatement,
   DatabaseAdapter,
   DeleteStatement,
@@ -48,7 +48,7 @@ import type { Predicate, WhereInput } from './operators.ts'
 import { and, eq, inList, normalizeWhereInput, or } from './operators.ts'
 import type { SqlStatement } from './sql.ts'
 import { rawSql, isSqlStatement } from './sql.ts'
-import type { AdapterStatement } from './adapter.ts'
+import type { DataManipulationStatement } from './adapter.ts'
 import type { Pretty } from './types.ts'
 import { normalizeColumnInput } from './references.ts'
 import type { ColumnInput, NormalizeColumnInput, TableMetadataLike } from './references.ts'
@@ -355,7 +355,7 @@ export type Database = {
     table: table,
     options: DeleteManyOptions<table>,
   ): Promise<WriteResult>
-  exec(statement: string | SqlStatement, values?: unknown[]): Promise<AdapterResult>
+  exec(statement: string | SqlStatement, values?: unknown[]): Promise<DataManipulationResult>
   transaction<result>(
     callback: (database: Database) => Promise<result>,
     options?: TransactionOptions,
@@ -718,7 +718,7 @@ class DatabaseRuntime implements Database {
     return toWriteResult(result)
   }
 
-  async exec(statement: string | SqlStatement, values: unknown[] = []): Promise<AdapterResult> {
+  async exec(statement: string | SqlStatement, values: unknown[] = []): Promise<DataManipulationResult> {
     let sqlStatement = isSqlStatement(statement) ? statement : rawSql(statement, values)
 
     return this[executeStatement]({
@@ -770,10 +770,10 @@ class DatabaseRuntime implements Database {
     }
   }
 
-  async [executeStatement](statement: AdapterStatement): Promise<AdapterResult> {
+  async [executeStatement](statement: DataManipulationStatement): Promise<DataManipulationResult> {
     try {
       return await this.#adapter.execute({
-        statement,
+        operation: statement,
         transaction: this.#token,
       })
     } catch (error) {
@@ -1801,7 +1801,7 @@ function applyPagination<row>(
   return limit === undefined ? offsetRows : offsetRows.slice(0, limit)
 }
 
-function normalizeRows(rows: AdapterResult['rows']): Record<string, unknown>[] {
+function normalizeRows(rows: DataManipulationResult['rows']): Record<string, unknown>[] {
   if (!rows) {
     return []
   }

@@ -17,7 +17,7 @@ import {
   ne,
   notInList,
   notNull,
-  type AdapterStatement,
+  type DataManipulationStatement,
   type DatabaseAdapter,
   or,
 } from '@remix-run/data-table'
@@ -43,7 +43,7 @@ let tasks = createTable({
   },
 })
 
-let statements: AdapterStatement[] = []
+let statements: DataManipulationStatement[] = []
 
 let fakeAdapter = {
   capabilities: {
@@ -52,7 +52,7 @@ let fakeAdapter = {
   },
 
   execute: async (request) => {
-    statements.push(request.statement)
+    statements.push(request.operation)
     return {}
   },
 } as DatabaseAdapter

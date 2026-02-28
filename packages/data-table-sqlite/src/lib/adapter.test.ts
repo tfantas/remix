@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
 import Database from 'better-sqlite3'
+import type { DataDefinitionStatement } from '@remix-run/data-table'
 import { createDatabase, createTable, eq } from '@remix-run/data-table'
 
 import { createSqliteDatabaseAdapter } from './adapter.ts'
@@ -58,7 +59,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
 
     let adapter = createSqliteDatabaseAdapter(sqlite as never)
     let result = await adapter.execute({
-      statement: {
+      operation: {
         kind: 'insertMany',
         table: accounts,
         values: [],
@@ -173,7 +174,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
 
     let adapter = createSqliteDatabaseAdapter(sqlite as never)
     let result = await adapter.execute({
-      statement: {
+      operation: {
         kind: 'count',
         table: accounts,
         joins: [],
@@ -208,7 +209,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
 
     let adapter = createSqliteDatabaseAdapter(sqlite as never)
     let result = await adapter.execute({
-      statement: {
+      operation: {
         kind: 'select',
         table: accounts,
         select: '*',
@@ -247,7 +248,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
 
     let adapter = createSqliteDatabaseAdapter(sqlite as never)
     let result = await adapter.execute({
-      statement: {
+      operation: {
         kind: 'insert',
         table: accountProjects,
         values: {
@@ -376,6 +377,95 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
 
     assert.equal(count, 1)
     sqlite.close()
+  })
+
+  it('compiles every DDL statement kind through compileSql()', () => {
+    let sqlite = {
+      prepare() {
+        return {
+          reader: true,
+          all() {
+            return []
+          },
+          run() {
+            return { changes: 0, lastInsertRowid: 0 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let adapter = createSqliteDatabaseAdapter(sqlite as never)
+    let operations: DataDefinitionStatement[] = [
+      {
+        kind: 'createTable',
+        table: { schema: 'app', name: 'users' },
+        ifNotExists: true,
+        columns: {
+          id: { type: 'integer', nullable: false, primaryKey: true },
+        },
+      },
+      {
+        kind: 'alterTable',
+        table: { schema: 'app', name: 'users' },
+        changes: [{ kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } }],
+      },
+      {
+        kind: 'renameTable',
+        from: { schema: 'app', name: 'users' },
+        to: { schema: 'app', name: 'accounts' },
+      },
+      { kind: 'dropTable', table: { schema: 'app', name: 'accounts' }, ifExists: true },
+      {
+        kind: 'createIndex',
+        index: {
+          table: { schema: 'app', name: 'users' },
+          columns: ['email'],
+          name: 'users_email_idx',
+        },
+      },
+      { kind: 'dropIndex', table: { schema: 'app', name: 'users' }, name: 'users_email_idx' },
+      {
+        kind: 'renameIndex',
+        table: { schema: 'app', name: 'users' },
+        from: 'users_email_idx',
+        to: 'users_email_idx_new',
+      },
+      {
+        kind: 'addForeignKey',
+        table: { schema: 'app', name: 'projects' },
+        constraint: {
+          columns: ['account_id'],
+          references: {
+            table: { schema: 'app', name: 'accounts' },
+            columns: ['id'],
+          },
+          name: 'projects_account_id_fk',
+          onDelete: 'cascade',
+        },
+      },
+      {
+        kind: 'dropForeignKey',
+        table: { schema: 'app', name: 'projects' },
+        name: 'projects_account_id_fk',
+      },
+      {
+        kind: 'addCheck',
+        table: { schema: 'app', name: 'users' },
+        constraint: {
+          name: 'users_email_check',
+          expression: "email like '%@%'",
+        },
+      },
+      { kind: 'dropCheck', table: { schema: 'app', name: 'users' }, name: 'users_email_check' },
+      { kind: 'raw', sql: { text: 'select 1', values: [] } },
+    ]
+
+    for (let operation of operations) {
+      let compiled = adapter.compileSql(operation)
+      assert.ok(compiled.length > 0, operation.kind)
+    }
   })
 
   it('treats dotted select aliases as single identifiers', async () => {

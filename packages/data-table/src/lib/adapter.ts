@@ -133,9 +133,9 @@ export type RawStatement = {
 }
 
 /**
- * Union of all canonical statement shapes.
+ * Union of all data-manipulation statement shapes.
  */
-export type AdapterStatement =
+export type DataManipulationStatement =
   | SelectStatement
   | CountStatement
   | ExistsStatement
@@ -144,6 +144,290 @@ export type AdapterStatement =
   | UpdateStatement
   | DeleteStatement
   | UpsertStatement
+  | RawStatement
+
+export type TableRef = {
+  name: string
+  schema?: string
+}
+
+export type ForeignKeyAction = 'cascade' | 'restrict' | 'set null' | 'set default' | 'no action'
+
+export type ColumnTypeName =
+  | 'varchar'
+  | 'text'
+  | 'integer'
+  | 'bigint'
+  | 'decimal'
+  | 'boolean'
+  | 'uuid'
+  | 'date'
+  | 'time'
+  | 'timestamp'
+  | 'json'
+  | 'binary'
+  | 'enum'
+
+export type ColumnDefault =
+  | { kind: 'literal'; value: unknown }
+  | { kind: 'now' }
+  | { kind: 'sql'; expression: string }
+
+export type ColumnComputed = {
+  expression: string
+  stored: boolean
+}
+
+export type IdentityOptions = {
+  always?: boolean
+  start?: number
+  increment?: number
+}
+
+export type ColumnReference = {
+  table: TableRef
+  columns: string[]
+  name?: string
+  onDelete?: ForeignKeyAction
+  onUpdate?: ForeignKeyAction
+}
+
+export type ColumnCheck = {
+  expression: string
+  name?: string
+}
+
+export type ColumnDefinition = {
+  type: ColumnTypeName
+  nullable?: boolean
+  primaryKey?: boolean
+  unique?: boolean | { name?: string }
+  default?: ColumnDefault
+  computed?: ColumnComputed
+  references?: ColumnReference
+  checks?: ColumnCheck[]
+  comment?: string
+  length?: number
+  precision?: number
+  scale?: number
+  unsigned?: boolean
+  withTimezone?: boolean
+  enumValues?: string[]
+  autoIncrement?: boolean
+  identity?: IdentityOptions
+  collate?: string
+  charset?: string
+}
+
+export type PrimaryKeyConstraint = {
+  columns: string[]
+  name?: string
+}
+
+export type UniqueConstraint = {
+  columns: string[]
+  name?: string
+}
+
+export type CheckConstraint = {
+  expression: string
+  name?: string
+}
+
+export type ForeignKeyConstraint = {
+  columns: string[]
+  references: {
+    table: TableRef
+    columns: string[]
+  }
+  name?: string
+  onDelete?: ForeignKeyAction
+  onUpdate?: ForeignKeyAction
+}
+
+export type IndexMethod = 'btree' | 'hash' | 'gin' | 'gist' | 'fulltext' | (string & {})
+
+export type IndexDefinition = {
+  table: TableRef
+  name?: string
+  columns: string[]
+  unique?: boolean
+  where?: string
+  using?: IndexMethod
+}
+
+export type CreateTableStatement = {
+  kind: 'createTable'
+  table: TableRef
+  ifNotExists?: boolean
+  columns: Record<string, ColumnDefinition>
+  primaryKey?: PrimaryKeyConstraint
+  uniques?: UniqueConstraint[]
+  checks?: CheckConstraint[]
+  foreignKeys?: ForeignKeyConstraint[]
+  comment?: string
+}
+
+export type AddColumnChange = {
+  kind: 'addColumn'
+  column: string
+  definition: ColumnDefinition
+}
+
+export type ChangeColumnChange = {
+  kind: 'changeColumn'
+  column: string
+  definition: ColumnDefinition
+}
+
+export type RenameColumnChange = {
+  kind: 'renameColumn'
+  from: string
+  to: string
+}
+
+export type DropColumnChange = {
+  kind: 'dropColumn'
+  column: string
+  ifExists?: boolean
+}
+
+export type AddPrimaryKeyChange = {
+  kind: 'addPrimaryKey'
+  constraint: PrimaryKeyConstraint
+}
+
+export type DropPrimaryKeyChange = {
+  kind: 'dropPrimaryKey'
+  name?: string
+}
+
+export type AddUniqueChange = {
+  kind: 'addUnique'
+  constraint: UniqueConstraint
+}
+
+export type DropUniqueChange = {
+  kind: 'dropUnique'
+  name: string
+}
+
+export type AddForeignKeyChange = {
+  kind: 'addForeignKey'
+  constraint: ForeignKeyConstraint
+}
+
+export type DropForeignKeyChange = {
+  kind: 'dropForeignKey'
+  name: string
+}
+
+export type AddCheckChange = {
+  kind: 'addCheck'
+  constraint: CheckConstraint
+}
+
+export type DropCheckChange = {
+  kind: 'dropCheck'
+  name: string
+}
+
+export type SetTableCommentChange = {
+  kind: 'setTableComment'
+  comment: string
+}
+
+export type AlterTableChange =
+  | AddColumnChange
+  | ChangeColumnChange
+  | RenameColumnChange
+  | DropColumnChange
+  | AddPrimaryKeyChange
+  | DropPrimaryKeyChange
+  | AddUniqueChange
+  | DropUniqueChange
+  | AddForeignKeyChange
+  | DropForeignKeyChange
+  | AddCheckChange
+  | DropCheckChange
+  | SetTableCommentChange
+
+export type AlterTableStatement = {
+  kind: 'alterTable'
+  table: TableRef
+  changes: AlterTableChange[]
+  ifExists?: boolean
+}
+
+export type RenameTableStatement = {
+  kind: 'renameTable'
+  from: TableRef
+  to: TableRef
+}
+
+export type DropTableStatement = {
+  kind: 'dropTable'
+  table: TableRef
+  ifExists?: boolean
+  cascade?: boolean
+}
+
+export type CreateIndexStatement = {
+  kind: 'createIndex'
+  index: IndexDefinition
+  ifNotExists?: boolean
+}
+
+export type DropIndexStatement = {
+  kind: 'dropIndex'
+  table: TableRef
+  name: string
+  ifExists?: boolean
+}
+
+export type RenameIndexStatement = {
+  kind: 'renameIndex'
+  table: TableRef
+  from: string
+  to: string
+}
+
+export type AddForeignKeyStatement = {
+  kind: 'addForeignKey'
+  table: TableRef
+  constraint: ForeignKeyConstraint
+}
+
+export type DropForeignKeyStatement = {
+  kind: 'dropForeignKey'
+  table: TableRef
+  name: string
+}
+
+export type AddCheckStatement = {
+  kind: 'addCheck'
+  table: TableRef
+  constraint: CheckConstraint
+}
+
+export type DropCheckStatement = {
+  kind: 'dropCheck'
+  table: TableRef
+  name: string
+}
+
+export type DataDefinitionStatement =
+  | CreateTableStatement
+  | AlterTableStatement
+  | RenameTableStatement
+  | DropTableStatement
+  | CreateIndexStatement
+  | DropIndexStatement
+  | RenameIndexStatement
+  | AddForeignKeyStatement
+  | DropForeignKeyStatement
+  | AddCheckStatement
+  | DropCheckStatement
   | RawStatement
 
 /**
@@ -166,17 +450,32 @@ export type TransactionOptions = {
  * Adapter execution request payload.
  */
 export type AdapterExecuteRequest = {
-  statement: AdapterStatement
+  operation: DataManipulationStatement
   transaction?: TransactionToken
 }
 
 /**
- * Adapter execution result payload.
+ * Adapter migration request payload.
  */
-export type AdapterResult = {
+export type AdapterMigrateRequest = {
+  operation: DataDefinitionStatement
+  transaction?: TransactionToken
+}
+
+/**
+ * Adapter data-manipulation result payload.
+ */
+export type DataManipulationResult = {
   rows?: Record<string, unknown>[]
   affectedRows?: number
   insertId?: unknown
+}
+
+/**
+ * Adapter data-definition result payload.
+ */
+export type DataDefinitionResult = {
+  affectedObjects?: number
 }
 
 /**
@@ -186,6 +485,8 @@ export type AdapterCapabilities = {
   returning: boolean
   savepoints: boolean
   upsert: boolean
+  transactionalDdl: boolean
+  migrationLock: boolean
 }
 
 /**
@@ -193,17 +494,25 @@ export type AdapterCapabilities = {
  */
 export type AdapterCapabilityOverrides = Pretty<Partial<AdapterCapabilities>>
 
+export interface SqlCompiler {
+  compileSql(operation: DataManipulationStatement | DataDefinitionStatement): SqlStatement[]
+}
+
 /**
  * Runtime contract implemented by concrete database adapters.
  */
 export interface DatabaseAdapter {
   dialect: string
   capabilities: AdapterCapabilities
-  execute(request: AdapterExecuteRequest): Promise<AdapterResult>
+  compileSql(operation: DataManipulationStatement | DataDefinitionStatement): SqlStatement[]
+  execute(request: AdapterExecuteRequest): Promise<DataManipulationResult>
+  migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult>
   beginTransaction(options?: TransactionOptions): Promise<TransactionToken>
   commitTransaction(token: TransactionToken): Promise<void>
   rollbackTransaction(token: TransactionToken): Promise<void>
   createSavepoint(token: TransactionToken, name: string): Promise<void>
   rollbackToSavepoint(token: TransactionToken, name: string): Promise<void>
   releaseSavepoint(token: TransactionToken, name: string): Promise<void>
+  acquireMigrationLock?(): Promise<void>
+  releaseMigrationLock?(): Promise<void>
 }

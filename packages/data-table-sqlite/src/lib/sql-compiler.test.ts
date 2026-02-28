@@ -17,7 +17,7 @@ import {
   notInList,
   isNull,
   notNull,
-  type AdapterStatement,
+  type DataManipulationStatement,
   type DatabaseAdapter,
   or,
   and,
@@ -43,7 +43,7 @@ let tasks = createTable({
   },
 })
 
-let statements: AdapterStatement[] = []
+let statements: DataManipulationStatement[] = []
 
 let fakeAdapter = {
   capabilities: {
@@ -52,16 +52,16 @@ let fakeAdapter = {
   },
 
   execute: async (request) => {
-    statements.push(request.statement)
+    statements.push(request.operation)
     // usefull for update
-    if (request.statement.kind === 'select') {
+    if (request.operation.kind === 'select') {
       return {
         rows: [{ id: 1 }],
       }
     }
 
     // for insert with returning
-    if (request.statement.kind === 'insert' && request.statement.returning) {
+    if (request.operation.kind === 'insert' && request.operation.returning) {
       return {
         rows: [{ id: 10 }],
       }

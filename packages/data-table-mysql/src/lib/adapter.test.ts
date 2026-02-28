@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
+import type { DataDefinitionStatement } from '@remix-run/data-table'
 import { createDatabase, createTable, eq, ilike, inList } from '@remix-run/data-table'
 
 import { createMysqlDatabaseAdapter } from './adapter.ts'
@@ -57,7 +58,7 @@ describe('mysql adapter', () => {
     let adapter = createMysqlDatabaseAdapter(connection as never)
 
     let result = await adapter.execute({
-      statement: {
+      operation: {
         kind: 'insertMany',
         table: accounts,
         values: [],
@@ -482,5 +483,86 @@ describe('mysql adapter', () => {
 
     assert.equal(result.affectedRows, 1)
     assert.equal(result.insertId, undefined)
+  })
+
+  it('compiles every DDL statement kind through compileSql()', () => {
+    let adapter = createMysqlDatabaseAdapter({
+      async query() {
+        return [[], []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    } as never)
+
+    let operations: DataDefinitionStatement[] = [
+      {
+        kind: 'createTable',
+        table: { schema: 'app', name: 'users' },
+        ifNotExists: true,
+        columns: {
+          id: { type: 'integer', nullable: false, primaryKey: true },
+        },
+      },
+      {
+        kind: 'alterTable',
+        table: { schema: 'app', name: 'users' },
+        changes: [{ kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } }],
+      },
+      {
+        kind: 'renameTable',
+        from: { schema: 'app', name: 'users' },
+        to: { schema: 'app', name: 'accounts' },
+      },
+      { kind: 'dropTable', table: { schema: 'app', name: 'accounts' }, ifExists: true },
+      {
+        kind: 'createIndex',
+        index: {
+          table: { schema: 'app', name: 'users' },
+          columns: ['email'],
+          name: 'users_email_idx',
+        },
+      },
+      { kind: 'dropIndex', table: { schema: 'app', name: 'users' }, name: 'users_email_idx' },
+      {
+        kind: 'renameIndex',
+        table: { schema: 'app', name: 'users' },
+        from: 'users_email_idx',
+        to: 'users_email_idx_new',
+      },
+      {
+        kind: 'addForeignKey',
+        table: { schema: 'app', name: 'projects' },
+        constraint: {
+          columns: ['account_id'],
+          references: {
+            table: { schema: 'app', name: 'accounts' },
+            columns: ['id'],
+          },
+          name: 'projects_account_id_fk',
+          onDelete: 'cascade',
+        },
+      },
+      {
+        kind: 'dropForeignKey',
+        table: { schema: 'app', name: 'projects' },
+        name: 'projects_account_id_fk',
+      },
+      {
+        kind: 'addCheck',
+        table: { schema: 'app', name: 'users' },
+        constraint: {
+          name: 'users_email_check',
+          expression: "email like '%@%'",
+        },
+      },
+      { kind: 'dropCheck', table: { schema: 'app', name: 'users' }, name: 'users_email_check' },
+      { kind: 'raw', sql: { text: 'select 1', values: [] } },
+    ]
+
+    for (let operation of operations) {
+      let compiled = adapter.compileSql(operation)
+      assert.ok(compiled.length > 0, operation.kind)
+    }
   })
 })

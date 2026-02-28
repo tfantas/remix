@@ -1,9 +1,9 @@
 import { getTableName, getTablePrimaryKey } from '@remix-run/data-table'
-import type { AdapterStatement, Predicate } from '@remix-run/data-table'
+import type { DataManipulationStatement, Predicate } from '@remix-run/data-table'
 
-type JoinClause = Extract<AdapterStatement, { kind: 'select' }>['joins'][number]
-type UpsertStatement = Extract<AdapterStatement, { kind: 'upsert' }>
-type StatementTable = Extract<AdapterStatement, { kind: 'select' }>['table']
+type JoinClause = Extract<DataManipulationStatement, { kind: 'select' }>['joins'][number]
+type UpsertStatement = Extract<DataManipulationStatement, { kind: 'upsert' }>
+type StatementTable = Extract<DataManipulationStatement, { kind: 'select' }>['table']
 
 type CompiledSql = {
   text: string
@@ -14,7 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileSqliteStatement(statement: AdapterStatement): CompiledSql {
+export function compileSqliteStatement(statement: DataManipulationStatement): CompiledSql {
   if (statement.kind === 'raw') {
     return {
       text: statement.sql.text,

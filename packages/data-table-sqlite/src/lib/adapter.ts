@@ -1,8 +1,15 @@
 import type {
   AdapterCapabilityOverrides,
   AdapterExecuteRequest,
-  AdapterResult,
+  AdapterMigrateRequest,
+  DataDefinitionResult,
+  DataDefinitionStatement,
+  DataManipulationResult,
+  DataManipulationStatement,
   DatabaseAdapter,
+  ColumnDefinition,
+  SqlStatement,
+  TableRef,
   TransactionOptions,
   TransactionToken,
 } from '@remix-run/data-table'
@@ -40,40 +47,64 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
       returning: options?.capabilities?.returning ?? true,
       savepoints: options?.capabilities?.savepoints ?? true,
       upsert: options?.capabilities?.upsert ?? true,
+      transactionalDdl: options?.capabilities?.transactionalDdl ?? true,
+      migrationLock: options?.capabilities?.migrationLock ?? false,
     }
   }
 
-  async execute(request: AdapterExecuteRequest): Promise<AdapterResult> {
-    if (request.statement.kind === 'insertMany' && request.statement.values.length === 0) {
+  compileSql(operation: DataManipulationStatement | DataDefinitionStatement): SqlStatement[] {
+    if (isDataManipulationOperation(operation)) {
+      let compiled = compileSqliteStatement(operation)
+      return [{ text: compiled.text, values: compiled.values }]
+    }
+
+    return compileSqliteDefinitionStatements(operation)
+  }
+
+  async execute(request: AdapterExecuteRequest): Promise<DataManipulationResult> {
+    if (request.operation.kind === 'insertMany' && request.operation.values.length === 0) {
       return {
         affectedRows: 0,
         insertId: undefined,
-        rows: request.statement.returning ? [] : undefined,
+        rows: request.operation.returning ? [] : undefined,
       }
     }
 
-    let statement = compileSqliteStatement(request.statement)
+    let statement = this.compileSql(request.operation)[0]
     let prepared = this.#database.prepare(statement.text)
 
     if (prepared.reader) {
       let rows = normalizeRows(prepared.all(...statement.values))
 
-      if (request.statement.kind === 'count' || request.statement.kind === 'exists') {
+      if (request.operation.kind === 'count' || request.operation.kind === 'exists') {
         rows = normalizeCountRows(rows)
       }
 
       return {
         rows,
-        affectedRows: normalizeAffectedRowsForReader(request.statement.kind, rows),
-        insertId: normalizeInsertIdForReader(request.statement.kind, request.statement, rows),
+        affectedRows: normalizeAffectedRowsForReader(request.operation.kind, rows),
+        insertId: normalizeInsertIdForReader(request.operation.kind, request.operation, rows),
       }
     }
 
     let result = prepared.run(...statement.values)
 
     return {
-      affectedRows: normalizeAffectedRowsForRun(request.statement.kind, result),
-      insertId: normalizeInsertIdForRun(request.statement.kind, request.statement, result),
+      affectedRows: normalizeAffectedRowsForRun(request.operation.kind, result),
+      insertId: normalizeInsertIdForRun(request.operation.kind, request.operation, result),
+    }
+  }
+
+  async migrate(request: AdapterMigrateRequest): Promise<DataDefinitionResult> {
+    let statements = this.compileSql(request.operation)
+
+    for (let statement of statements) {
+      let prepared = this.#database.prepare(statement.text)
+      prepared.run(...statement.values)
+    }
+
+    return {
+      affectedObjects: statements.length,
     }
   }
 
@@ -175,7 +206,7 @@ function normalizeCountRows(rows: Record<string, unknown>[]): Record<string, unk
 }
 
 function normalizeAffectedRowsForReader(
-  kind: AdapterExecuteRequest['statement']['kind'],
+  kind: AdapterExecuteRequest['operation']['kind'],
   rows: Record<string, unknown>[],
 ): number | undefined {
   if (isWriteStatementKind(kind)) {
@@ -186,8 +217,8 @@ function normalizeAffectedRowsForReader(
 }
 
 function normalizeInsertIdForReader(
-  kind: AdapterExecuteRequest['statement']['kind'],
-  statement: AdapterExecuteRequest['statement'],
+  kind: AdapterExecuteRequest['operation']['kind'],
+  statement: AdapterExecuteRequest['operation'],
   rows: Record<string, unknown>[],
 ): unknown {
   if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
@@ -207,7 +238,7 @@ function normalizeInsertIdForReader(
 }
 
 function normalizeAffectedRowsForRun(
-  kind: AdapterExecuteRequest['statement']['kind'],
+  kind: AdapterExecuteRequest['operation']['kind'],
   result: RunResult,
 ): number | undefined {
   if (kind === 'select' || kind === 'count' || kind === 'exists') {
@@ -218,8 +249,8 @@ function normalizeAffectedRowsForRun(
 }
 
 function normalizeInsertIdForRun(
-  kind: AdapterExecuteRequest['statement']['kind'],
-  statement: AdapterExecuteRequest['statement'],
+  kind: AdapterExecuteRequest['operation']['kind'],
+  statement: AdapterExecuteRequest['operation'],
   result: RunResult,
 ): unknown {
   if (!isInsertStatementKind(kind) || !isInsertStatement(statement)) {
@@ -237,7 +268,35 @@ function quoteIdentifier(value: string): string {
   return '"' + value.replace(/"/g, '""') + '"'
 }
 
-function isWriteStatementKind(kind: AdapterExecuteRequest['statement']['kind']): boolean {
+function quoteTableRef(table: TableRef): string {
+  if (table.schema) {
+    return quoteIdentifier(table.schema) + '.' + quoteIdentifier(table.name)
+  }
+
+  return quoteIdentifier(table.name)
+}
+
+function quoteLiteral(value: unknown): string {
+  if (value === null) {
+    return 'null'
+  }
+
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    return String(value)
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? '1' : '0'
+  }
+
+  if (value instanceof Date) {
+    return quoteLiteral(value.toISOString())
+  }
+
+  return '\'' + String(value).replace(/'/g, "''") + '\''
+}
+
+function isWriteStatementKind(kind: AdapterExecuteRequest['operation']['kind']): boolean {
   return (
     kind === 'insert' ||
     kind === 'insertMany' ||
@@ -247,17 +306,431 @@ function isWriteStatementKind(kind: AdapterExecuteRequest['statement']['kind']):
   )
 }
 
-function isInsertStatementKind(kind: AdapterExecuteRequest['statement']['kind']): boolean {
+function isInsertStatementKind(kind: AdapterExecuteRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
 function isInsertStatement(
-  statement: AdapterExecuteRequest['statement'],
+  statement: AdapterExecuteRequest['operation'],
 ): statement is Extract<
-  AdapterExecuteRequest['statement'],
+  AdapterExecuteRequest['operation'],
   { kind: 'insert' | 'insertMany' | 'upsert' }
 > {
   return (
     statement.kind === 'insert' || statement.kind === 'insertMany' || statement.kind === 'upsert'
   )
+}
+
+function isDataManipulationOperation(
+  operation: DataManipulationStatement | DataDefinitionStatement,
+): operation is DataManipulationStatement {
+  return (
+    operation.kind === 'select' ||
+    operation.kind === 'count' ||
+    operation.kind === 'exists' ||
+    operation.kind === 'insert' ||
+    operation.kind === 'insertMany' ||
+    operation.kind === 'update' ||
+    operation.kind === 'delete' ||
+    operation.kind === 'upsert' ||
+    operation.kind === 'raw'
+  )
+}
+
+function compileSqliteDefinitionStatements(statement: DataDefinitionStatement): SqlStatement[] {
+  if (statement.kind === 'raw') {
+    return [{ text: statement.sql.text, values: [...statement.sql.values] }]
+  }
+
+  if (statement.kind === 'createTable') {
+    let columns = Object.keys(statement.columns).map(
+      (columnName) => quoteIdentifier(columnName) + ' ' + compileSqliteColumn(statement.columns[columnName]),
+    )
+    let constraints: string[] = []
+
+    if (statement.primaryKey) {
+      constraints.push(
+        'primary key (' +
+          statement.primaryKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')',
+      )
+    }
+
+    for (let unique of statement.uniques ?? []) {
+      constraints.push(
+        (unique.name ? 'constraint ' + quoteIdentifier(unique.name) + ' ' : '') +
+          'unique (' +
+          unique.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')',
+      )
+    }
+
+    for (let check of statement.checks ?? []) {
+      constraints.push(
+        (check.name ? 'constraint ' + quoteIdentifier(check.name) + ' ' : '') +
+          'check (' +
+          check.expression +
+          ')',
+      )
+    }
+
+    for (let foreignKey of statement.foreignKeys ?? []) {
+      let clause =
+        (foreignKey.name ? 'constraint ' + quoteIdentifier(foreignKey.name) + ' ' : '') +
+        'foreign key (' +
+        foreignKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
+        ') references ' +
+        quoteTableRef(foreignKey.references.table) +
+        ' (' +
+        foreignKey.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+        ')'
+
+      if (foreignKey.onDelete) {
+        clause += ' on delete ' + foreignKey.onDelete
+      }
+
+      if (foreignKey.onUpdate) {
+        clause += ' on update ' + foreignKey.onUpdate
+      }
+
+      constraints.push(clause)
+    }
+
+    return [
+      {
+        text:
+          'create table ' +
+          (statement.ifNotExists ? 'if not exists ' : '') +
+          quoteTableRef(statement.table) +
+          ' (' +
+          [...columns, ...constraints].join(', ') +
+          ')',
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'alterTable') {
+    let statements: SqlStatement[] = []
+
+    for (let change of statement.changes) {
+      let sql = 'alter table ' + quoteTableRef(statement.table) + ' '
+
+      if (change.kind === 'addColumn') {
+        sql +=
+          'add column ' + quoteIdentifier(change.column) + ' ' + compileSqliteColumn(change.definition)
+      } else if (change.kind === 'changeColumn') {
+        sql +=
+          'alter column ' +
+          quoteIdentifier(change.column) +
+          ' type ' +
+          compileSqliteColumnType(change.definition)
+      } else if (change.kind === 'renameColumn') {
+        sql +=
+          'rename column ' + quoteIdentifier(change.from) + ' to ' + quoteIdentifier(change.to)
+      } else if (change.kind === 'dropColumn') {
+        sql += 'drop column ' + quoteIdentifier(change.column)
+      } else if (change.kind === 'addPrimaryKey') {
+        sql +=
+          'add primary key (' +
+          change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')'
+      } else if (change.kind === 'dropPrimaryKey') {
+        sql += 'drop primary key'
+      } else if (change.kind === 'addUnique') {
+        sql +=
+          'add ' +
+          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'unique (' +
+          change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')'
+      } else if (change.kind === 'dropUnique') {
+        sql += 'drop constraint ' + quoteIdentifier(change.name)
+      } else if (change.kind === 'addForeignKey') {
+        sql +=
+          'add ' +
+          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'foreign key (' +
+          change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ') references ' +
+          quoteTableRef(change.constraint.references.table) +
+          ' (' +
+          change.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')'
+      } else if (change.kind === 'dropForeignKey') {
+        sql += 'drop constraint ' + quoteIdentifier(change.name)
+      } else if (change.kind === 'addCheck') {
+        sql +=
+          'add ' +
+          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'check (' +
+          change.constraint.expression +
+          ')'
+      } else if (change.kind === 'dropCheck') {
+        sql += 'drop constraint ' + quoteIdentifier(change.name)
+      } else if (change.kind === 'setTableComment') {
+        continue
+      } else {
+        continue
+      }
+
+      statements.push({ text: sql, values: [] })
+    }
+
+    return statements
+  }
+
+  if (statement.kind === 'renameTable') {
+    return [
+      {
+        text:
+          'alter table ' + quoteTableRef(statement.from) + ' rename to ' + quoteIdentifier(statement.to.name),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'dropTable') {
+    return [
+      {
+        text:
+          'drop table ' +
+          (statement.ifExists ? 'if exists ' : '') +
+          quoteTableRef(statement.table),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'createIndex') {
+    return [
+      {
+        text:
+          'create ' +
+          (statement.index.unique ? 'unique ' : '') +
+          'index ' +
+          (statement.ifNotExists ? 'if not exists ' : '') +
+          quoteIdentifier(statement.index.name ?? defaultIndexName(statement.index.columns)) +
+          ' on ' +
+          quoteTableRef(statement.index.table) +
+          ' (' +
+          statement.index.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')' +
+          (statement.index.where ? ' where ' + statement.index.where : ''),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'dropIndex') {
+    return [
+      {
+        text: 'drop index ' + (statement.ifExists ? 'if exists ' : '') + quoteIdentifier(statement.name),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'renameIndex') {
+    return [
+      {
+        text:
+          'alter table ' +
+          quoteTableRef(statement.table) +
+          ' rename index ' +
+          quoteIdentifier(statement.from) +
+          ' to ' +
+          quoteIdentifier(statement.to),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'addForeignKey') {
+    return [
+      {
+        text:
+          'alter table ' +
+          quoteTableRef(statement.table) +
+          ' add ' +
+          (statement.constraint.name
+            ? 'constraint ' + quoteIdentifier(statement.constraint.name) + ' '
+            : '') +
+          'foreign key (' +
+          statement.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ') references ' +
+          quoteTableRef(statement.constraint.references.table) +
+          ' (' +
+          statement.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          ')' +
+          (statement.constraint.onDelete ? ' on delete ' + statement.constraint.onDelete : '') +
+          (statement.constraint.onUpdate ? ' on update ' + statement.constraint.onUpdate : ''),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'dropForeignKey') {
+    return [
+      {
+        text:
+          'alter table ' +
+          quoteTableRef(statement.table) +
+          ' drop constraint ' +
+          quoteIdentifier(statement.name),
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'addCheck') {
+    return [
+      {
+        text:
+          'alter table ' +
+          quoteTableRef(statement.table) +
+          ' add ' +
+          (statement.constraint.name
+            ? 'constraint ' + quoteIdentifier(statement.constraint.name) + ' '
+            : '') +
+          'check (' +
+          statement.constraint.expression +
+          ')',
+        values: [],
+      },
+    ]
+  }
+
+  if (statement.kind === 'dropCheck') {
+    return [
+      {
+        text:
+          'alter table ' +
+          quoteTableRef(statement.table) +
+          ' drop constraint ' +
+          quoteIdentifier(statement.name),
+        values: [],
+      },
+    ]
+  }
+
+  throw new Error('Unsupported data definition statement kind')
+}
+
+function compileSqliteColumn(definition: ColumnDefinition): string {
+  let parts = [compileSqliteColumnType(definition)]
+
+  if (definition.nullable === false) {
+    parts.push('not null')
+  }
+
+  if (definition.default) {
+    if (definition.default.kind === 'now') {
+      parts.push('default current_timestamp')
+    } else if (definition.default.kind === 'sql') {
+      parts.push('default ' + definition.default.expression)
+    } else {
+      parts.push('default ' + quoteLiteral(definition.default.value))
+    }
+  }
+
+  if (definition.primaryKey) {
+    parts.push('primary key')
+  }
+
+  if (definition.unique) {
+    parts.push('unique')
+  }
+
+  if (definition.computed) {
+    parts.push('generated always as (' + definition.computed.expression + ')')
+    parts.push(definition.computed.stored ? 'stored' : 'virtual')
+  }
+
+  if (definition.references) {
+    let clause =
+      'references ' +
+      quoteTableRef(definition.references.table) +
+      ' (' +
+      definition.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+      ')'
+
+    if (definition.references.onDelete) {
+      clause += ' on delete ' + definition.references.onDelete
+    }
+
+    if (definition.references.onUpdate) {
+      clause += ' on update ' + definition.references.onUpdate
+    }
+
+    parts.push(clause)
+  }
+
+  if (definition.checks && definition.checks.length > 0) {
+    for (let check of definition.checks) {
+      parts.push('check (' + check.expression + ')')
+    }
+  }
+
+  return parts.join(' ')
+}
+
+function compileSqliteColumnType(definition: ColumnDefinition): string {
+  if (definition.type === 'varchar') {
+    return 'text'
+  }
+
+  if (definition.type === 'text') {
+    return 'text'
+  }
+
+  if (definition.type === 'integer') {
+    return 'integer'
+  }
+
+  if (definition.type === 'bigint') {
+    return 'integer'
+  }
+
+  if (definition.type === 'decimal') {
+    return 'numeric'
+  }
+
+  if (definition.type === 'boolean') {
+    return 'integer'
+  }
+
+  if (definition.type === 'uuid') {
+    return 'text'
+  }
+
+  if (definition.type === 'date') {
+    return 'text'
+  }
+
+  if (definition.type === 'time') {
+    return 'text'
+  }
+
+  if (definition.type === 'timestamp') {
+    return 'text'
+  }
+
+  if (definition.type === 'json') {
+    return 'text'
+  }
+
+  if (definition.type === 'binary') {
+    return 'blob'
+  }
+
+  if (definition.type === 'enum') {
+    return 'text'
+  }
+
+  return 'text'
+}
+
+function defaultIndexName(columns: string[]): string {
+  return columns.join('_') + '_idx'
 }
