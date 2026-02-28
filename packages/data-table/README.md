@@ -399,6 +399,24 @@ await db.exec(sql`select * from users where id = ${'u_001'}`)
 await db.exec(rawSql('update users set role = ? where id = ?', ['admin', 'u_001']))
 ```
 
+Use `sql` when you need raw SQL plus safe value interpolation:
+
+```ts
+import { sql } from 'remix/data-table'
+
+let email = input.email
+let minCreatedAt = input.minCreatedAt
+
+let result = await db.exec(sql`
+  select id, email
+  from users
+  where email = ${email}
+    and created_at >= ${minCreatedAt}
+`)
+```
+
+`sql` keeps values parameterized per adapter dialect, so you can avoid manual string concatenation.
+
 ## Related Packages
 
 - [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema parsing and validation used by `data-table`
