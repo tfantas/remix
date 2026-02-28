@@ -1,2 +1,2 @@
 // IMPORTANT: This file is auto-generated, please do not edit manually.
-export * from '@remix-run/data-table/internal/sql-helpers'
+export * from '@remix-run/data-table/sql-helpers'
