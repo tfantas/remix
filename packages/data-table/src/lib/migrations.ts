@@ -202,31 +202,25 @@ export interface MigrationSchemaApi {
   columnExists(table: string, column: string): Promise<boolean>
 }
 
-type ColumnBuilderState = {
-  definition: ColumnDefinition
-}
-
 export class ColumnBuilder {
-  #state: ColumnBuilderState
+  #definition: ColumnDefinition
 
   constructor(definition: ColumnDefinition) {
-    this.#state = {
-      definition,
-    }
+    this.#definition = definition
   }
 
   nullable(): ColumnBuilder {
-    this.#state.definition.nullable = true
+    this.#definition.nullable = true
     return this
   }
 
   notNull(): ColumnBuilder {
-    this.#state.definition.nullable = false
+    this.#definition.nullable = false
     return this
   }
 
   default(value: unknown): ColumnBuilder {
-    this.#state.definition.default = {
+    this.#definition.default = {
       kind: 'literal',
       value,
     }
@@ -234,14 +228,14 @@ export class ColumnBuilder {
   }
 
   defaultNow(): ColumnBuilder {
-    this.#state.definition.default = {
+    this.#definition.default = {
       kind: 'now',
     }
     return this
   }
 
   defaultSql(expression: string): ColumnBuilder {
-    this.#state.definition.default = {
+    this.#definition.default = {
       kind: 'sql',
       expression,
     }
@@ -249,12 +243,12 @@ export class ColumnBuilder {
   }
 
   primaryKey(): ColumnBuilder {
-    this.#state.definition.primaryKey = true
+    this.#definition.primaryKey = true
     return this
   }
 
   unique(name?: string): ColumnBuilder {
-    this.#state.definition.unique = name ? { name } : true
+    this.#definition.unique = name ? { name } : true
     return this
   }
 
@@ -263,50 +257,50 @@ export class ColumnBuilder {
     columns: string | string[] = 'id',
     options?: { name?: string },
   ): ColumnBuilder {
-    this.#state.definition.references = {
+    this.#definition.references = {
       table: toTableRef(table),
       columns: Array.isArray(columns) ? [...columns] : [columns],
-      onDelete: this.#state.definition.references?.onDelete,
-      onUpdate: this.#state.definition.references?.onUpdate,
-      name: options?.name ?? this.#state.definition.references?.name,
+      onDelete: this.#definition.references?.onDelete,
+      onUpdate: this.#definition.references?.onUpdate,
+      name: options?.name ?? this.#definition.references?.name,
     }
     return this
   }
 
   onDelete(action: ForeignKeyAction): ColumnBuilder {
-    if (!this.#state.definition.references) {
+    if (!this.#definition.references) {
       throw new Error('onDelete() requires references() to be set first')
     }
 
-    this.#state.definition.references.onDelete = action
+    this.#definition.references.onDelete = action
     return this
   }
 
   onUpdate(action: ForeignKeyAction): ColumnBuilder {
-    if (!this.#state.definition.references) {
+    if (!this.#definition.references) {
       throw new Error('onUpdate() requires references() to be set first')
     }
 
-    this.#state.definition.references.onUpdate = action
+    this.#definition.references.onUpdate = action
     return this
   }
 
   check(expression: string, name?: string): ColumnBuilder {
-    let checks = this.#state.definition.checks ?? []
+    let checks = this.#definition.checks ?? []
 
     checks.push({ expression, name })
-    this.#state.definition.checks = checks
+    this.#definition.checks = checks
 
     return this
   }
 
   comment(text: string): ColumnBuilder {
-    this.#state.definition.comment = text
+    this.#definition.comment = text
     return this
   }
 
   computed(expression: string, options?: { stored?: boolean }): ColumnBuilder {
-    this.#state.definition.computed = {
+    this.#definition.computed = {
       expression,
       stored: options?.stored ?? true,
     }
@@ -314,59 +308,59 @@ export class ColumnBuilder {
   }
 
   unsigned(): ColumnBuilder {
-    this.#state.definition.unsigned = true
+    this.#definition.unsigned = true
     return this
   }
 
   autoIncrement(): ColumnBuilder {
-    this.#state.definition.autoIncrement = true
+    this.#definition.autoIncrement = true
     return this
   }
 
   identity(options?: IdentityOptions): ColumnBuilder {
-    this.#state.definition.identity = options ?? {}
+    this.#definition.identity = options ?? {}
     return this
   }
 
   collate(name: string): ColumnBuilder {
-    this.#state.definition.collate = name
+    this.#definition.collate = name
     return this
   }
 
   charset(name: string): ColumnBuilder {
-    this.#state.definition.charset = name
+    this.#definition.charset = name
     return this
   }
 
   length(value: number): ColumnBuilder {
-    this.#state.definition.length = value
+    this.#definition.length = value
     return this
   }
 
   precision(value: number, scale?: number): ColumnBuilder {
-    this.#state.definition.precision = value
+    this.#definition.precision = value
 
     if (scale !== undefined) {
-      this.#state.definition.scale = scale
+      this.#definition.scale = scale
     }
 
     return this
   }
 
   scale(value: number): ColumnBuilder {
-    this.#state.definition.scale = value
+    this.#definition.scale = value
     return this
   }
 
   timezone(enabled = true): ColumnBuilder {
-    this.#state.definition.withTimezone = enabled
+    this.#definition.withTimezone = enabled
     return this
   }
 
   build(): ColumnDefinition {
     return {
-      ...this.#state.definition,
-      checks: this.#state.definition.checks ? [...this.#state.definition.checks] : undefined,
+      ...this.#definition,
+      checks: this.#definition.checks ? [...this.#definition.checks] : undefined,
     }
   }
 }
