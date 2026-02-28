@@ -52,6 +52,12 @@ interface PublishSummary {
   }>
 }
 
+interface LocalPackage {
+  dirName: string
+  npmName: string
+  localVersion: string
+}
+
 /**
  * Read published packages from pnpm's publish summary file.
  * See https://pnpm.io/cli/publish#--report-summary
@@ -75,35 +81,12 @@ function readPublishSummary(): PublishedPackage[] {
 }
 
 /**
- * Check if a specific version of a package is published on npm.
+ * Get local package metadata from the workspace.
  */
-async function isVersionPublished(packageName: string, version: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    cp.exec(
-      `npm view ${packageName}@${version} version`,
-      { encoding: 'utf-8' },
-      (_error, stdout) => {
-        // If we get output that matches the version, it exists
-        resolve(stdout.trim() === version)
-      },
-    )
-  })
-}
-
-interface LocalPackage {
-  dirName: string
-  npmName: string
-  localVersion: string
-}
-
-/**
- * Get all packages that have versions not yet published to npm.
- */
-async function getUnpublishedPackages(): Promise<PublishedPackage[]> {
+function getLocalPackages(): LocalPackage[] {
   let packageDirNames = getAllPackageDirNames()
-
-  // Collect all local package info first
   let localPackages: LocalPackage[] = []
+
   for (let packageDirName of packageDirNames) {
     let packageJsonPath = getPackageFile(packageDirName, 'package.json')
 
@@ -119,6 +102,31 @@ async function getUnpublishedPackages(): Promise<PublishedPackage[]> {
       localVersion: packageJson.version as string,
     })
   }
+
+  return localPackages
+}
+
+/**
+ * Check if a specific version of a package is published on npm.
+ */
+async function isVersionPublished(packageName: string, version: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    cp.exec(
+      `npm view ${packageName}@${version} version`,
+      { encoding: 'utf-8' },
+      (_error, stdout) => {
+        // If we get output that matches the version, it exists
+        resolve(stdout.trim() === version)
+      },
+    )
+  })
+}
+
+/**
+ * Get all packages that have versions not yet published to npm.
+ */
+async function getUnpublishedPackages(): Promise<PublishedPackage[]> {
+  let localPackages = getLocalPackages()
 
   // Query npm for all packages in parallel
   let npmResults = await Promise.all(
@@ -141,6 +149,54 @@ async function getUnpublishedPackages(): Promise<PublishedPackage[]> {
   }
 
   return unpublished
+}
+
+/**
+ * Find package versions that are already published to npm but missing local git tags.
+ * This enables release recovery after partial publish failures.
+ */
+async function getPublishedPackagesMissingTags(): Promise<PublishedPackage[]> {
+  let localPackages = getLocalPackages()
+
+  let npmResults = await Promise.all(
+    localPackages.map(async (pkg) => ({
+      pkg,
+      isPublished: await isVersionPublished(pkg.npmName, pkg.localVersion),
+    })),
+  )
+
+  let missingTags: PublishedPackage[] = []
+  for (let { pkg, isPublished } of npmResults) {
+    if (!isPublished) {
+      continue
+    }
+
+    let tag = getGitTag(pkg.npmName, pkg.localVersion)
+    if (!tagExists(tag)) {
+      missingTags.push({
+        packageName: pkg.npmName,
+        version: pkg.localVersion,
+        tag,
+      })
+    }
+  }
+
+  return missingTags
+}
+
+function dedupePublishedPackages(packages: PublishedPackage[]): PublishedPackage[] {
+  let seenTags = new Set<string>()
+  let deduped: PublishedPackage[] = []
+
+  for (let pkg of packages) {
+    if (seenTags.has(pkg.tag)) {
+      continue
+    }
+    seenTags.add(pkg.tag)
+    deduped.push(pkg)
+  }
+
+  return deduped
 }
 
 interface ChangelogWarning {
@@ -300,14 +356,23 @@ async function main() {
     return
   }
 
-  if (published.length === 0) {
-    console.log('\nNo packages were published.')
-    return
+  if (published.length > 0) {
+    console.log(`\n${published.length} package${published.length === 1 ? '' : 's'} published:`)
+    for (let pkg of published) {
+      console.log(`  • ${pkg.packageName}@${pkg.version}`)
+    }
+  } else {
+    console.log('\nNo new packages were published.')
   }
 
-  console.log(`\n${published.length} package${published.length === 1 ? '' : 's'} published:`)
-  for (let pkg of published) {
-    console.log(`  • ${pkg.packageName}@${pkg.version}`)
+  let packagesNeedingTagsOrReleases = dedupePublishedPackages([
+    ...published,
+    ...(await getPublishedPackagesMissingTags()),
+  ])
+
+  if (packagesNeedingTagsOrReleases.length === 0) {
+    console.log('\nNo packages need git tags or GitHub releases.')
+    return
   }
 
   // Configure git
@@ -316,9 +381,11 @@ async function main() {
   logAndExec('git config user.email "hello@remix.run"')
 
   // Create tags (skip if already exist)
-  console.log(`\nCreating tag${published.length === 1 ? '' : 's'}...`)
+  console.log(
+    `\nCreating tag${packagesNeedingTagsOrReleases.length === 1 ? '' : 's'} for published packages...`,
+  )
   let tagsCreated = 0
-  for (let pkg of published) {
+  for (let pkg of packagesNeedingTagsOrReleases) {
     if (tagExists(pkg.tag)) {
       console.log(`  ⊘ ${pkg.tag} (already exists)`)
     } else {
@@ -340,7 +407,7 @@ async function main() {
   console.log('\nCreating GitHub releases...')
   let failedReleases: Array<{ pkg: PublishedPackage; error: string }> = []
 
-  for (let pkg of published) {
+  for (let pkg of packagesNeedingTagsOrReleases) {
     let result = await createRelease(pkg.packageName, pkg.version)
     if (result.status === 'created') {
       console.log(`  ✓ ${pkg.packageName} v${pkg.version}`)
