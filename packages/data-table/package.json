@@ -22,6 +22,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./internal/sql-compiler": "./src/internal/sql-compiler.ts",
+    "./internal/sql-helpers": "./src/internal/sql-helpers.ts",
     "./migrations": "./src/migrations.ts",
     "./migrations/node": "./src/migrations/node.ts",
     "./operators": "./src/operators.ts",
@@ -37,6 +38,10 @@
       "./internal/sql-compiler": {
         "types": "./dist/internal/sql-compiler.d.ts",
         "default": "./dist/internal/sql-compiler.js"
+      },
+      "./internal/sql-helpers": {
+        "types": "./dist/internal/sql-helpers.d.ts",
+        "default": "./dist/internal/sql-helpers.js"
       },
       "./migrations": {
         "types": "./dist/migrations.d.ts",
