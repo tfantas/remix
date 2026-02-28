@@ -193,7 +193,10 @@ async function outputExportsChangeFiles(exportsConfig: Record<string, string>) {
   let changeFileBaseName = 'remix.update-exports.md'
   let changeFile = path.join(remixChangesDir, `${semverType}.${changeFileBaseName}`)
   let alternateSemverType = semverType === 'major' ? 'minor' : 'major'
-  let alternateChangeFile = path.join(remixChangesDir, `${alternateSemverType}.${changeFileBaseName}`)
+  let alternateChangeFile = path.join(
+    remixChangesDir,
+    `${alternateSemverType}.${changeFileBaseName}`,
+  )
   let legacyChangeFilePattern = /^(major|minor)\.remix\.update-exports-\d+\.md$/
   let changes = ''
 
