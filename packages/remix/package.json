@@ -30,8 +30,6 @@
     "./data-schema/coerce": "./src/data-schema/coerce.ts",
     "./data-schema/lazy": "./src/data-schema/lazy.ts",
     "./data-table": "./src/data-table.ts",
-    "./data-table/migrations": "./src/data-table/migrations.ts",
-    "./data-table/migrations/node": "./src/data-table/migrations/node.ts",
     "./data-table-mysql": "./src/data-table-mysql.ts",
     "./data-table-postgres": "./src/data-table-postgres.ts",
     "./data-table-sqlite": "./src/data-table-sqlite.ts",
@@ -125,14 +123,6 @@
       "./data-table": {
         "types": "./dist/data-table.d.ts",
         "default": "./dist/data-table.js"
-      },
-      "./data-table/migrations": {
-        "types": "./dist/data-table/migrations.d.ts",
-        "default": "./dist/data-table/migrations.js"
-      },
-      "./data-table/migrations/node": {
-        "types": "./dist/data-table/migrations/node.d.ts",
-        "default": "./dist/data-table/migrations/node.js"
       },
       "./data-table-mysql": {
         "types": "./dist/data-table-mysql.d.ts",
