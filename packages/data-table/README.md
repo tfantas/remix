@@ -266,6 +266,10 @@ let payments = table({
     }
   },
   afterRead({ value }) {
+    if (!('amount' in value)) {
+      return { value }
+    }
+
     return {
       value: {
         ...value,
@@ -277,20 +281,20 @@ let payments = table({
 })
 ```
 
-Validation semantics:
+Validation and lifecycle semantics:
 
-- `beforeWrite` runs before `validate` for writes
+- Write order is `beforeWrite -> validate -> timestamp/default touch -> execute -> afterWrite`
 - `validate` runs for writes (`create`, `createMany`, `insert`, `insertMany`, `update`, `updateMany`, `upsert`)
 - Hook context includes `{ operation: 'create' | 'update', tableName, value }`
-- Payloads are partial objects
+- Write payloads are partial objects
 - Unknown columns fail validation before and after hook processing
-- Timestamp touch/default handling runs after `beforeWrite` and `validate`
-- `afterWrite` runs after successful write execution
 - `beforeDelete` can veto deletes by returning `{ issues }`
 - `afterDelete` runs after successful deletes with `affectedRows`
 - `afterRead` runs for each loaded row (root rows, eager-loaded relation rows, and write-returning rows)
+- `afterRead` receives the current read shape, which may be partial/projection rows; guard field access accordingly
 - Predicate values (`where`, `having`, join predicates) are not runtime-validated
 - Lifecycle callbacks are synchronous; returning a Promise throws a validation error
+- Callback validation errors include `metadata.source` (`beforeWrite`, `validate`, `beforeDelete`, `afterRead`, etc.) for easier debugging
 - Callbacks do not introduce implicit transactions (use `db.transaction(...)` when you need rollback guarantees)
 
 ## Transactions

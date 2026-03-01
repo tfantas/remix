@@ -139,6 +139,14 @@ type SavepointCounter = {
 const executeOperation = Symbol('executeOperation')
 const loadRowsWithRelations = Symbol('loadRowsWithRelations')
 
+type LifecycleCallbackSource =
+  | 'beforeWrite'
+  | 'validate'
+  | 'afterWrite'
+  | 'beforeDelete'
+  | 'afterDelete'
+  | 'afterRead'
+
 type RelationMapForSourceName<tableName extends string> = Record<
   string,
   AnyRelation & {
@@ -2249,7 +2257,7 @@ function validateWriteValues<table extends AnyTable>(
     assertSynchronousCallbackResult(tableName, operation, 'beforeWrite', beforeWriteResult)
 
     if (hasIssues(beforeWriteResult)) {
-      throwValidationIssues(tableName, beforeWriteResult.issues, operation)
+      throwValidationIssues(tableName, beforeWriteResult.issues, operation, 'beforeWrite')
     }
 
     if (!hasValue(beforeWriteResult)) {
@@ -2260,12 +2268,13 @@ function validateWriteValues<table extends AnyTable>(
           metadata: {
             table: tableName,
             operation,
+            source: 'beforeWrite',
           },
         },
       )
     }
 
-    normalizedInput = normalizeWriteObject(table, beforeWriteResult.value, operation)
+    normalizedInput = normalizeWriteObject(table, beforeWriteResult.value, operation, 'beforeWrite')
   }
 
   let validator = getTableValidator(table)
@@ -2282,7 +2291,7 @@ function validateWriteValues<table extends AnyTable>(
   assertSynchronousCallbackResult(tableName, operation, 'validate', validationResult)
 
   if (hasIssues(validationResult)) {
-    throwValidationIssues(tableName, validationResult.issues, operation)
+    throwValidationIssues(tableName, validationResult.issues, operation, 'validate')
   }
 
   if (!hasValue(validationResult)) {
@@ -2293,12 +2302,13 @@ function validateWriteValues<table extends AnyTable>(
         metadata: {
           table: tableName,
           operation,
+          source: 'validate',
         },
       },
     )
   }
 
-  return normalizeWriteObject(table, validationResult.value, operation)
+  return normalizeWriteObject(table, validationResult.value, operation, 'validate')
 }
 
 function hasIssues(value: unknown): value is { issues: ReadonlyArray<ValidationIssue> } {
@@ -2313,6 +2323,7 @@ function normalizeWriteObject<table extends AnyTable>(
   table: table,
   value: unknown,
   operation: TableWriteOperation,
+  source?: LifecycleCallbackSource,
 ): Record<string, unknown> {
   let tableName = getTableName(table)
   let columns = getTableColumns(table)
@@ -2325,6 +2336,7 @@ function normalizeWriteObject<table extends AnyTable>(
         metadata: {
           table: tableName,
           operation,
+          ...(source ? { source } : {}),
         },
       },
     )
@@ -2346,6 +2358,7 @@ function normalizeWriteObject<table extends AnyTable>(
             table: tableName,
             column: key,
             operation,
+            ...(source ? { source } : {}),
           },
         },
       )
@@ -2361,6 +2374,7 @@ function throwValidationIssues(
   tableName: string,
   issues: ReadonlyArray<ValidationIssue>,
   operation: TableLifecycleOperation,
+  source?: LifecycleCallbackSource,
 ): never {
   let firstIssue = issues[0]
   let issuePath = firstIssue?.path
@@ -2376,6 +2390,7 @@ function throwValidationIssues(
           table: tableName,
           column,
           operation,
+          ...(source ? { source } : {}),
         },
       },
     )
@@ -2385,6 +2400,7 @@ function throwValidationIssues(
     metadata: {
       table: tableName,
       operation,
+      ...(source ? { source } : {}),
     },
   })
 }
@@ -2392,7 +2408,7 @@ function throwValidationIssues(
 function assertSynchronousCallbackResult(
   tableName: string,
   operation: TableLifecycleOperation,
-  callbackName: string,
+  callbackName: LifecycleCallbackSource,
   value: unknown,
 ): void {
   if (!isPromiseLike(value)) {
@@ -2406,6 +2422,7 @@ function assertSynchronousCallbackResult(
       metadata: {
         table: tableName,
         operation,
+        source: callbackName,
       },
     },
   )
@@ -2438,7 +2455,7 @@ function runBeforeDeleteHook<table extends AnyTable>(
   }
 
   if (hasIssues(callbackResult)) {
-    throwValidationIssues(context.tableName, callbackResult.issues, 'delete')
+    throwValidationIssues(context.tableName, callbackResult.issues, 'delete', 'beforeDelete')
   }
 
   throw new DataTableValidationError(
@@ -2448,6 +2465,7 @@ function runBeforeDeleteHook<table extends AnyTable>(
       metadata: {
         table: context.tableName,
         operation: 'delete',
+        source: 'beforeDelete',
       },
     },
   )
@@ -2496,12 +2514,12 @@ function applyAfterReadHooksToRows<table extends AnyTable>(
   return rows.map((row) => {
     let callbackResult = callback({
       tableName,
-      value: row as TableRow<table>,
+      value: row as Partial<TableRow<table>>,
     })
     assertSynchronousCallbackResult(tableName, 'read', 'afterRead', callbackResult)
 
     if (hasIssues(callbackResult)) {
-      throwValidationIssues(tableName, callbackResult.issues, 'read')
+      throwValidationIssues(tableName, callbackResult.issues, 'read', 'afterRead')
     }
 
     if (!hasValue(callbackResult)) {
@@ -2512,6 +2530,7 @@ function applyAfterReadHooksToRows<table extends AnyTable>(
           metadata: {
             table: tableName,
             operation: 'read',
+            source: 'afterRead',
           },
         },
       )
@@ -2581,6 +2600,7 @@ function normalizeReadObject(tableName: string, value: unknown): Record<string, 
         metadata: {
           table: tableName,
           operation: 'read',
+          source: 'afterRead',
         },
       },
     )

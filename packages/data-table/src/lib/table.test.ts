@@ -90,7 +90,7 @@ describe('table metadata', () => {
     let afterWrite = () => {}
     let beforeDelete = () => undefined
     let afterDelete = () => {}
-    let afterRead = ({ value }: { value: { id: number } }) => ({ value })
+    let afterRead = ({ value }: { value: Partial<{ id: number }> }) => ({ value })
 
     let users = table({
       name: 'users',

@@ -994,7 +994,11 @@ describe('writes and validation', () => {
           .insert({ id: 11, email: 'billing@studio.test', status: 300 as never })
       },
       function (error: unknown) {
-        return error instanceof DataTableValidationError
+        return (
+          error instanceof DataTableValidationError &&
+          error.metadata?.operation === 'create' &&
+          error.metadata?.source === 'validate'
+        )
       },
     )
   })
@@ -1294,8 +1298,76 @@ describe('writes and validation', () => {
       (error: unknown) =>
         error instanceof DataTableValidationError &&
         error.message === 'Invalid value for table "accounts"' &&
-        error.metadata?.operation === 'delete',
+        error.metadata?.operation === 'delete' &&
+        error.metadata?.source === 'beforeDelete',
     )
+  })
+
+  it('includes callback source metadata for afterRead issues', async () => {
+    let issueAfterReadAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      afterRead() {
+        return {
+          issues: [{ message: 'Row rejected' }],
+        }
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'amy@studio.test', status: 'active' }],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await assert.rejects(
+      async () => {
+        await db.find(issueAfterReadAccounts, 1)
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Invalid value for table "accounts"' &&
+        error.metadata?.operation === 'read' &&
+        error.metadata?.source === 'afterRead',
+    )
+  })
+
+  it('passes projected row shapes to afterRead callbacks', async () => {
+    let sawMissingStatus = false
+    let projectedAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      afterRead({ value }) {
+        sawMissingStatus = !('status' in value)
+        return { value }
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'amy@studio.test', status: 'active' }],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    let rows = await db.query(projectedAccounts).select({ id: projectedAccounts.id }).all()
+
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].id, 1)
+    assert.equal(sawMissingStatus, true)
   })
 
   it('applies afterRead to root rows, related rows, and write-returning rows', async () => {
@@ -1398,7 +1470,8 @@ describe('writes and validation', () => {
       },
       (error: unknown) =>
         error instanceof DataTableValidationError &&
-        error.message === 'Invalid beforeWrite callback result for table "accounts"',
+        error.message === 'Invalid beforeWrite callback result for table "accounts"' &&
+        error.metadata?.source === 'beforeWrite',
     )
 
     await assert.rejects(
@@ -1407,7 +1480,8 @@ describe('writes and validation', () => {
       },
       (error: unknown) =>
         error instanceof DataTableValidationError &&
-        error.message === 'Invalid afterRead callback result for table "accounts"',
+        error.message === 'Invalid afterRead callback result for table "accounts"' &&
+        error.metadata?.source === 'afterRead',
     )
   })
 
@@ -1438,7 +1512,8 @@ describe('writes and validation', () => {
       },
       (error: unknown) =>
         error instanceof DataTableValidationError &&
-        error.message === 'Invalid beforeDelete callback result for table "accounts"',
+        error.message === 'Invalid beforeDelete callback result for table "accounts"' &&
+        error.metadata?.source === 'beforeDelete',
     )
   })
 

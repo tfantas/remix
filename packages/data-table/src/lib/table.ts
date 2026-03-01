@@ -94,11 +94,14 @@ export type TableAfterDelete = (context: TableAfterDeleteContext) => void
 
 export type TableAfterReadContext<row extends Record<string, unknown>> = {
   tableName: string
-  value: row
+  /**
+   * The current row shape being returned. This may be a projection/partial row.
+   */
+  value: Partial<row>
 }
 
 export type TableAfterReadResult<row extends Record<string, unknown>> =
-  | { value: row }
+  | { value: Partial<row> }
   | { issues: ReadonlyArray<ValidationIssue> }
 
 export type TableAfterRead<row extends Record<string, unknown>> = (
@@ -344,6 +347,7 @@ export function getTableAfterDelete<table extends AnyTable>(
 
 /**
  * Returns a table's optional after-read lifecycle callback.
+ * The callback receives the current read shape, which may be a projected partial row.
  * @param table Source table instance.
  * @returns After-read callback or `undefined`.
  */
