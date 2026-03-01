@@ -225,7 +225,6 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
       let migrationDb: MigrationDatabase = db
 
       let context: MigrationContext = {
-        dialect: adapter.dialect,
         db: migrationDb,
         schema,
       }

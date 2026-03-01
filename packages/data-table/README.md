@@ -358,11 +358,11 @@ let users = table({
 })
 
 export default createMigration({
-  async up({ db, schema, dialect }) {
+  async up({ db, schema }) {
     await schema.createTable(users)
     await schema.createIndex(users, 'email', { unique: true })
 
-    if (dialect === 'sqlite') {
+    if (db.adapter.dialect === 'sqlite') {
       await db.exec('pragma foreign_keys = on')
     }
   },

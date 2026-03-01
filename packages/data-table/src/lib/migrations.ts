@@ -23,10 +23,6 @@ export type Database = DataManipulationDatabase
  */
 export type MigrationContext = {
   /**
-   * Adapter dialect name (for example `postgres`, `mysql`, or `sqlite`).
-   */
-  dialect: string
-  /**
    * Immediate data runtime (`query/create/update/exec/transaction`).
    */
   db: Database
@@ -72,10 +68,10 @@ export type Migration = {
  * })
  *
  * export default createMigration({
- *   async up({ db, schema, dialect }) {
+ *   async up({ db, schema }) {
  *     await schema.createTable(users)
  *
- *     if (dialect === 'sqlite') {
+ *     if (db.adapter.dialect === 'sqlite') {
  *       await db.exec('pragma foreign_keys = on')
  *     }
  *   },
