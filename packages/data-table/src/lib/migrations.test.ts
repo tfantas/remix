@@ -8,6 +8,7 @@ import type {
   DataMigrationOperation,
   DataManipulationResult,
   DatabaseAdapter,
+  TableRef,
   TransactionToken,
 } from './adapter.ts'
 import { column } from './column.ts'
@@ -40,6 +41,7 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   journalRows: JournalRow[] = []
   migratedOperations: DataMigrationOperation[] = []
   executedRawSql: SqlStatement[] = []
+  knownTables = new Map<string, Set<string>>()
   lockAcquireCount = 0
   lockReleaseCount = 0
   beginTransactionCount = 0
@@ -122,6 +124,10 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
       operation.table.schema === undefined
     ) {
       this.journalTableCreated = true
+      this.knownTables.set(
+        tableRefKey(operation.table),
+        new Set<string>(Object.keys(operation.columns)),
+      )
       return { affectedOperations: 1 }
     }
 
@@ -129,8 +135,54 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
       throw new Error('Forced migrate failure for kind ' + operation.kind)
     }
 
+    if (operation.kind === 'createTable') {
+      this.knownTables.set(tableRefKey(operation.table), new Set<string>(Object.keys(operation.columns)))
+    }
+
+    if (operation.kind === 'dropTable') {
+      this.knownTables.delete(tableRefKey(operation.table))
+    }
+
+    if (operation.kind === 'renameTable') {
+      let fromKey = tableRefKey(operation.from)
+      let toKey = tableRefKey(operation.to)
+      let columns = this.knownTables.get(fromKey)
+
+      if (columns) {
+        this.knownTables.delete(fromKey)
+        this.knownTables.set(toKey, columns)
+      }
+    }
+
+    if (operation.kind === 'alterTable') {
+      let key = tableRefKey(operation.table)
+      let columns = this.knownTables.get(key) ?? new Set<string>()
+
+      for (let change of operation.changes) {
+        if (change.kind === 'addColumn') {
+          columns.add(change.column)
+        } else if (change.kind === 'dropColumn') {
+          columns.delete(change.column)
+        } else if (change.kind === 'renameColumn') {
+          columns.delete(change.from)
+          columns.add(change.to)
+        }
+      }
+
+      this.knownTables.set(key, columns)
+    }
+
     this.migratedOperations.push(operation)
     return { affectedOperations: 1 }
+  }
+
+  async hasTable(table: TableRef): Promise<boolean> {
+    return this.knownTables.has(tableRefKey(table))
+  }
+
+  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+    let columns = this.knownTables.get(tableRefKey(table))
+    return columns?.has(column) === true
   }
 
   async beginTransaction(): Promise<TransactionToken> {
@@ -178,6 +230,14 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
       throw new Error('Unknown transaction token: ' + token.id)
     }
   }
+}
+
+function tableRefKey(table: TableRef): string {
+  if (table.schema) {
+    return table.schema + '.' + table.name
+  }
+
+  return table.name
 }
 
 function createIdTable(name: string) {
@@ -330,12 +390,12 @@ describe('migration runner', () => {
           },
         })
         await db.createTable(usersTable)
-        await db.createIndex(usersTable, 'users_email_idx', 'email', { unique: true })
+        await db.createIndex(usersTable, 'email', { name: 'users_email_idx', unique: true })
 
         await db.alterTable(usersTable, (table) => {
           table.addColumn('status', column.text().default('active'))
-          table.addCheck('users_status_check', "status in ('active', 'disabled')")
-          table.addIndex('users_status_idx', 'status')
+          table.addCheck("status in ('active', 'disabled')", { name: 'users_status_check' })
+          table.addIndex('status', { name: 'users_status_idx' })
         })
 
         await db.renameIndex(usersTable, 'users_status_idx', 'users_status_idx_v2')
@@ -377,6 +437,172 @@ describe('migration runner', () => {
     let rawStatementOperation = adapter.migratedOperations[6]
     assert.equal(rawStatementOperation.kind, 'raw')
     assert.deepEqual(rawStatementOperation.sql, sql`select ${123}`)
+  })
+
+  it('auto-generates deterministic names when omitted', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ db }) {
+        let accountsTable = table({
+          name: 'app.accounts',
+          columns: {
+            id: column.integer().primaryKey(),
+          },
+        })
+        let usersTable = table({
+          name: 'app.users',
+          columns: {
+            id: column.integer().primaryKey(),
+            account_id: column.integer().notNull(),
+            email: column.text().notNull().unique(),
+          },
+        })
+
+        await db.createTable(accountsTable)
+        await db.createTable(usersTable)
+        await db.createIndex(usersTable, 'email')
+
+        await db.alterTable(usersTable, (table) => {
+          table.addPrimaryKey('id')
+          table.addUnique('email')
+          table.addForeignKey('account_id', accountsTable, 'id')
+          table.addCheck('id > 0')
+          table.addIndex('email')
+        })
+
+        await db.addForeignKey(usersTable, 'account_id', accountsTable, 'id')
+        await db.addCheck(usersTable, 'id > 0')
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'names', migration }])
+    await runner.up()
+
+    let createUsers = adapter.migratedOperations[1]
+    assert.equal(createUsers?.kind, 'createTable')
+    if (createUsers.kind !== 'createTable') {
+      throw new Error('Expected createTable operation at index 1')
+    }
+    assert.equal(createUsers.primaryKey?.name, 'app_users_pk')
+    assert.equal(createUsers.uniques?.[0]?.name, 'app_users_email_uq')
+
+    let createIndex = adapter.migratedOperations[2]
+    assert.equal(createIndex?.kind, 'createIndex')
+    if (createIndex.kind !== 'createIndex') {
+      throw new Error('Expected createIndex operation at index 2')
+    }
+    assert.equal(createIndex.index.name, 'app_users_email_idx')
+
+    let alterTable = adapter.migratedOperations[3]
+    assert.equal(alterTable?.kind, 'alterTable')
+    if (alterTable.kind !== 'alterTable') {
+      throw new Error('Expected alterTable operation at index 3')
+    }
+
+    let alterAddPrimaryKey = alterTable.changes.find((change) => change.kind === 'addPrimaryKey')
+    if (!alterAddPrimaryKey || alterAddPrimaryKey.kind !== 'addPrimaryKey') {
+      throw new Error('Expected addPrimaryKey change')
+    }
+    assert.equal(alterAddPrimaryKey.constraint.name, 'app_users_pk')
+
+    let alterAddUnique = alterTable.changes.find((change) => change.kind === 'addUnique')
+    if (!alterAddUnique || alterAddUnique.kind !== 'addUnique') {
+      throw new Error('Expected addUnique change')
+    }
+    assert.equal(alterAddUnique.constraint.name, 'app_users_email_uq')
+
+    let alterAddForeignKey = alterTable.changes.find((change) => change.kind === 'addForeignKey')
+    if (!alterAddForeignKey || alterAddForeignKey.kind !== 'addForeignKey') {
+      throw new Error('Expected addForeignKey change')
+    }
+    assert.equal(alterAddForeignKey.constraint.name, 'app_users_account_id_app_accounts_id_fk')
+
+    let alterAddCheck = alterTable.changes.find((change) => change.kind === 'addCheck')
+    if (!alterAddCheck || alterAddCheck.kind !== 'addCheck') {
+      throw new Error('Expected addCheck change')
+    }
+    assert.ok(alterAddCheck.constraint.name.startsWith('app_users_chk_'))
+
+    let topLevelAddForeignKey = adapter.migratedOperations[5]
+    assert.equal(topLevelAddForeignKey?.kind, 'addForeignKey')
+    if (topLevelAddForeignKey.kind !== 'addForeignKey') {
+      throw new Error('Expected addForeignKey operation at index 5')
+    }
+    assert.equal(topLevelAddForeignKey.constraint.name, 'app_users_account_id_app_accounts_id_fk')
+
+    let topLevelAddCheck = adapter.migratedOperations[6]
+    assert.equal(topLevelAddCheck?.kind, 'addCheck')
+    if (topLevelAddCheck.kind !== 'addCheck') {
+      throw new Error('Expected addCheck operation at index 6')
+    }
+    assert.equal(topLevelAddCheck.constraint.name, alterAddCheck.constraint.name)
+  })
+
+  it('prefers explicit names over generated defaults', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    let migration = createMigration({
+      async up({ db }) {
+        let usersTable = table({
+          name: 'users',
+          columns: {
+            id: column.integer().primaryKey(),
+            email: column.text().notNull(),
+          },
+        })
+
+        await db.createTable(usersTable)
+        await db.createIndex(usersTable, 'email', { name: 'users_email_idx' })
+        await db.alterTable(usersTable, (table) => {
+          table.addPrimaryKey('id', { name: 'users_pk_named' })
+          table.addUnique('email', { name: 'users_email_uq_named' })
+          table.addCheck('id > 0', { name: 'users_id_check_named' })
+          table.addIndex('email', { name: 'users_email_alter_idx_named' })
+        })
+      },
+      async down() {},
+    })
+
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'named', migration }])
+    await runner.up()
+
+    let createIndex = adapter.migratedOperations[1]
+    assert.equal(createIndex?.kind, 'createIndex')
+    if (createIndex.kind !== 'createIndex') {
+      throw new Error('Expected createIndex operation at index 1')
+    }
+    assert.equal(createIndex.index.name, 'users_email_idx')
+
+    let alterTable = adapter.migratedOperations[2]
+    assert.equal(alterTable?.kind, 'alterTable')
+    if (alterTable.kind !== 'alterTable') {
+      throw new Error('Expected alterTable operation at index 2')
+    }
+
+    let addPrimaryKey = alterTable.changes.find((change) => change.kind === 'addPrimaryKey')
+    if (!addPrimaryKey || addPrimaryKey.kind !== 'addPrimaryKey') {
+      throw new Error('Expected addPrimaryKey change')
+    }
+    assert.equal(addPrimaryKey.constraint.name, 'users_pk_named')
+
+    let addUnique = alterTable.changes.find((change) => change.kind === 'addUnique')
+    if (!addUnique || addUnique.kind !== 'addUnique') {
+      throw new Error('Expected addUnique change')
+    }
+    assert.equal(addUnique.constraint.name, 'users_email_uq_named')
+
+    let addCheck = alterTable.changes.find((change) => change.kind === 'addCheck')
+    if (!addCheck || addCheck.kind !== 'addCheck') {
+      throw new Error('Expected addCheck change')
+    }
+    assert.equal(addCheck.constraint.name, 'users_id_check_named')
+
+    let alterIndex = adapter.migratedOperations[3]
+    assert.equal(alterIndex?.kind, 'createIndex')
+    if (alterIndex.kind !== 'createIndex') {
+      throw new Error('Expected createIndex operation at index 3')
+    }
+    assert.equal(alterIndex.index.name, 'users_email_alter_idx_named')
   })
 
   it('applies, reverts by step, and reverts by target', async () => {
@@ -611,7 +837,9 @@ describe('migration runner', () => {
           },
         })
         await db.createTable(accountsTable)
-        await db.createIndex(accountsTable, 'accounts_email_idx', ['email', 'id'], {
+        await db.createIndex(accountsTable, ['email', 'id'], {
+          name: 'accounts_email_idx',
+          ifNotExists: true,
           unique: true,
           where: 'id > 0',
           using: 'btree',
@@ -622,34 +850,21 @@ describe('migration runner', () => {
           table.changeColumn('status', column.varchar(20).notNull())
           table.renameColumn('status', 'account_status')
           table.dropColumn('legacy_status', { ifExists: true })
-          table.addPrimaryKey('accounts_pk_v2', 'id')
+          table.addPrimaryKey('id', { name: 'accounts_pk_v2' })
           table.dropPrimaryKey('accounts_pk_v2')
-          table.addUnique('accounts_status_uq', ['account_status'])
+          table.addUnique(['account_status'], { name: 'accounts_status_uq' })
           table.dropUnique('accounts_status_uq')
-          table.addForeignKey('accounts_self_fk', 'id', accountsTable, 'id')
+          table.addForeignKey('id', accountsTable, 'id', { name: 'accounts_self_fk' })
           table.dropForeignKey('accounts_self_fk')
-          table.addCheck('accounts_status_check', "account_status in ('active', 'disabled')")
+          table.addCheck("account_status in ('active', 'disabled')", { name: 'accounts_status_check' })
           table.dropCheck('accounts_status_check')
-          table.addIndex('accounts_status_idx', ['account_status', 'id'])
+          table.addIndex(['account_status', 'id'], {
+            name: 'accounts_status_idx',
+            ifNotExists: true,
+          })
           table.dropIndex('accounts_status_idx')
           table.comment('Accounts table v2')
         })
-
-        await db.renameTable(accountsTable, accountsV2Table)
-        await db.dropTable(accountsV2Table, { ifExists: true, cascade: true })
-        await db.createIndex(accountsTable, 'accounts_compound_idx', ['id', 'email'], {
-          unique: true,
-        })
-        await db.dropIndex(accountsTable, 'accounts_compound_idx', { ifExists: true })
-        await db.renameIndex(accountsTable, 'accounts_old_idx', 'accounts_new_idx')
-        await db.addForeignKey(accountsTable, 'accounts_fk_global', 'id', authUsersTable, undefined, {
-          onDelete: 'cascade',
-          onUpdate: 'restrict',
-        })
-        await db.dropForeignKey(accountsTable, 'accounts_fk_global')
-        await db.addCheck(accountsTable, 'accounts_global_check', 'id > 0')
-        await db.dropCheck(accountsTable, 'accounts_global_check')
-        await db.plan('analyze')
 
         let accountsExists = await db.hasTable(accountsTable)
         let idColumnExists = await db.hasColumn(accountsTable, 'id')
@@ -657,6 +872,24 @@ describe('migration runner', () => {
         if (!accountsExists || !idColumnExists) {
           throw new Error('Expected schema introspection checks to succeed')
         }
+
+        await db.renameTable(accountsTable, 'app.accounts_v2')
+        await db.dropTable(accountsV2Table, { ifExists: true, cascade: true })
+        await db.createIndex(accountsTable, ['id', 'email'], {
+          name: 'accounts_compound_idx',
+          unique: true,
+        })
+        await db.dropIndex(accountsTable, 'accounts_compound_idx', { ifExists: true })
+        await db.renameIndex(accountsTable, 'accounts_old_idx', 'accounts_new_idx')
+        await db.addForeignKey(accountsTable, 'id', authUsersTable, undefined, {
+          name: 'accounts_fk_global',
+          onDelete: 'cascade',
+          onUpdate: 'restrict',
+        })
+        await db.dropForeignKey(accountsTable, 'accounts_fk_global')
+        await db.addCheck(accountsTable, 'id > 0', { name: 'accounts_global_check' })
+        await db.dropCheck(accountsTable, 'accounts_global_check')
+        await db.plan('analyze')
       },
       async down() {},
     })
@@ -683,6 +916,13 @@ describe('migration runner', () => {
       'raw',
     ])
 
+    let createIndexOperation = adapter.migratedOperations[1]
+    assert.equal(createIndexOperation?.kind, 'createIndex')
+    if (createIndexOperation.kind !== 'createIndex') {
+      throw new Error('Expected createIndex operation at index 1')
+    }
+    assert.equal(createIndexOperation.ifNotExists, true)
+
     let alterTableOperation = adapter.migratedOperations[2]
     assert.equal(alterTableOperation?.kind, 'alterTable')
     if (alterTableOperation.kind !== 'alterTable') {
@@ -703,6 +943,13 @@ describe('migration runner', () => {
     }
     assert.deepEqual(addForeignKeyChange.constraint.columns, ['id'])
     assert.deepEqual(addForeignKeyChange.constraint.references.columns, ['id'])
+
+    let alterCreateIndexOperation = adapter.migratedOperations[3]
+    assert.equal(alterCreateIndexOperation?.kind, 'createIndex')
+    if (alterCreateIndexOperation.kind !== 'createIndex') {
+      throw new Error('Expected createIndex operation at index 3')
+    }
+    assert.equal(alterCreateIndexOperation.ifNotExists, true)
 
     let addForeignKeyOperation = adapter.migratedOperations[10]
     assert.equal(addForeignKeyOperation?.kind, 'addForeignKey')

@@ -482,6 +482,12 @@ describe('query builder', () => {
       async createSavepoint() {},
       async rollbackToSavepoint() {},
       async releaseSavepoint() {},
+      async hasTable() {
+        return false
+      },
+      async hasColumn() {
+        return false
+      },
     }
 
     let db = createTestDatabase(adapter)
@@ -540,6 +546,12 @@ describe('query builder', () => {
       async createSavepoint() {},
       async rollbackToSavepoint() {},
       async releaseSavepoint() {},
+      async hasTable() {
+        return false
+      },
+      async hasColumn() {
+        return false
+      },
     }
 
     let db = createTestDatabase(adapter)
@@ -791,6 +803,12 @@ describe('query builder', () => {
       async createSavepoint() {},
       async rollbackToSavepoint() {},
       async releaseSavepoint() {},
+      async hasTable() {
+        return false
+      },
+      async hasColumn() {
+        return false
+      },
     }
 
     let db = createTestDatabase(adapter)
@@ -1084,6 +1102,12 @@ describe('writes and validation', () => {
       async createSavepoint() {},
       async rollbackToSavepoint() {},
       async releaseSavepoint() {},
+      async hasTable() {
+        return false
+      },
+      async hasColumn() {
+        return false
+      },
     } satisfies DatabaseAdapter
 
     let db = createDatabase(adapter)
@@ -2028,6 +2052,12 @@ describe('adapter errors', () => {
       async createSavepoint() {},
       async rollbackToSavepoint() {},
       async releaseSavepoint() {},
+      async hasTable() {
+        return false
+      },
+      async hasColumn() {
+        return false
+      },
     }
 
     let db = createTestDatabase(adapter)

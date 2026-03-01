@@ -506,6 +506,8 @@ export interface DatabaseAdapter {
   compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[]
   execute(request: DataManipulationRequest): Promise<DataManipulationResult>
   migrate(request: DataMigrationRequest): Promise<DataMigrationResult>
+  hasTable(table: TableRef): Promise<boolean>
+  hasColumn(table: TableRef, column: string): Promise<boolean>
   beginTransaction(options?: TransactionOptions): Promise<TransactionToken>
   commitTransaction(token: TransactionToken): Promise<void>
   rollbackTransaction(token: TransactionToken): Promise<void>

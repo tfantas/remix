@@ -140,6 +140,23 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
+  async hasTable(table: TableRef): Promise<boolean> {
+    let relation = toPostgresRelationName(table)
+    let result = await this.#client.query('select to_regclass($1) is not null as "exists"', [relation])
+    let row = result.rows[0] as Record<string, unknown> | undefined
+    return toBooleanExists(row?.exists)
+  }
+
+  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+    let relation = toPostgresRelationName(table)
+    let result = await this.#client.query(
+      'select exists (select 1 from pg_attribute where attrelid = to_regclass($1) and attname = $2 and attnum > 0 and not attisdropped) as "exists"',
+      [relation, column],
+    )
+    let row = result.rows[0] as Record<string, unknown> | undefined
+    return toBooleanExists(row?.exists)
+  }
+
   async beginTransaction(options?: TransactionOptions): Promise<TransactionToken> {
     let releaseOnClose = false
     let transactionClient: PostgresTransactionClient
@@ -362,6 +379,30 @@ function normalizeInsertId(
 
 function quoteIdentifier(value: string): string {
   return '"' + value.replace(/"/g, '""') + '"'
+}
+
+function toPostgresRelationName(table: TableRef): string {
+  if (table.schema) {
+    return quoteIdentifier(table.schema) + '.' + quoteIdentifier(table.name)
+  }
+
+  return quoteIdentifier(table.name)
+}
+
+function toBooleanExists(value: unknown): boolean {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value > 0
+  }
+
+  if (typeof value === 'string') {
+    return value === 't' || value === 'true' || value === '1'
+  }
+
+  return false
 }
 
 function isInsertOperationKind(kind: DataManipulationRequest['operation']['kind']): boolean {

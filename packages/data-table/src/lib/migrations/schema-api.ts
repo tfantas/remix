@@ -5,9 +5,7 @@ import type {
   ColumnDefinition,
   CreateTableOperation,
   DataMigrationOperation,
-  ForeignKeyAction,
   ForeignKeyConstraint,
-  IndexDefinition,
   PrimaryKeyConstraint,
   TableRef,
   UniqueConstraint,
@@ -19,10 +17,27 @@ import {
   getTablePrimaryKey,
 } from '../table.ts'
 import type { AnyTable } from '../table.ts'
-import type { AlterTableBuilder, KeyColumns, MigrationOperations, TableInput } from '../migrations.ts'
+import type {
+  AlterTableBuilder,
+  CreateIndexOptions,
+  ForeignKeyOptions,
+  KeyColumns,
+  MigrationOperations,
+  NamedConstraintOptions,
+  TableInput,
+} from '../migrations.ts'
 
 import { ColumnBuilder } from '../column.ts'
-import { normalizeIndexColumns, normalizeKeyColumns, toTableRef } from './helpers.ts'
+import {
+  createCheckName,
+  createForeignKeyName,
+  createIndexName,
+  createPrimaryKeyName,
+  createUniqueName,
+  normalizeIndexColumns,
+  normalizeKeyColumns,
+  toTableRef,
+} from './helpers.ts'
 
 function asColumnDefinition(definition: ColumnDefinition | ColumnBuilder): ColumnDefinition {
   if (definition instanceof ColumnBuilder) {
@@ -32,34 +47,12 @@ function asColumnDefinition(definition: ColumnDefinition | ColumnBuilder): Colum
   return definition
 }
 
-function asTableName(value: TableInput): string {
-  if (typeof value === 'string') {
-    return value
-  }
-
-  return getTableName(value)
-}
-
 function asTableRef(value: TableInput): TableRef {
-  return toTableRef(asTableName(value))
-}
-
-function normalizeTableIdentifier(value: string): string {
-  let normalized = value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-
-  if (normalized.length === 0) {
-    return 'table'
+  if (typeof value === 'string') {
+    return toTableRef(value)
   }
 
-  return normalized
-}
-
-function createPrimaryKeyConstraintName(table: TableRef): string {
-  let qualifiedName = table.schema ? table.schema + '_' + table.name : table.name
-  return normalizeTableIdentifier(qualifiedName) + '_pk'
+  return toTableRef(getTableName(value))
 }
 
 function lowerTableForCreate(table: AnyTable): CreateTableOperation {
@@ -85,9 +78,13 @@ function lowerTableForCreate(table: AnyTable): CreateTableOperation {
 
     let unique = sourceDefinition.unique
 
-    if (unique && typeof unique === 'object' && unique.name) {
+    if (unique) {
+      let uniqueName =
+        typeof unique === 'object' && unique.name
+          ? unique.name
+          : createUniqueName(tableRef, [columnName])
       uniques.push({
-        name: unique.name,
+        name: uniqueName,
         columns: [columnName],
       })
       columnDefinition.unique = undefined
@@ -96,19 +93,23 @@ function lowerTableForCreate(table: AnyTable): CreateTableOperation {
     if (sourceDefinition.checks) {
       for (let check of sourceDefinition.checks) {
         checks.push({
-          name: check.name,
+          name: check.name || createCheckName(tableRef, check.expression),
           expression: check.expression,
         })
       }
     }
 
     if (sourceDefinition.references) {
+      let referenceColumns = [...sourceDefinition.references.columns]
+      let referencesTable = { ...sourceDefinition.references.table }
       foreignKeys.push({
-        name: sourceDefinition.references.name,
+        name:
+          sourceDefinition.references.name ||
+          createForeignKeyName(tableRef, [columnName], referencesTable, referenceColumns),
         columns: [columnName],
         references: {
-          table: { ...sourceDefinition.references.table },
-          columns: [...sourceDefinition.references.columns],
+          table: referencesTable,
+          columns: referenceColumns,
         },
         onDelete: sourceDefinition.references.onDelete,
         onUpdate: sourceDefinition.references.onUpdate,
@@ -124,7 +125,7 @@ function lowerTableForCreate(table: AnyTable): CreateTableOperation {
   if (primaryKeyColumns.length > 0) {
     primaryKey = {
       columns: primaryKeyColumns,
-      name: createPrimaryKeyConstraintName(tableRef),
+      name: createPrimaryKeyName(tableRef, primaryKeyColumns),
     }
   }
 
@@ -168,10 +169,14 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropColumn', column: name, ifExists: options?.ifExists })
   }
 
-  addPrimaryKey(name: string, columns: KeyColumns): void {
+  addPrimaryKey(columns: KeyColumns, options?: NamedConstraintOptions): void {
+    let normalizedColumns = normalizeKeyColumns(columns)
     this.alterChanges.push({
       kind: 'addPrimaryKey',
-      constraint: { columns: normalizeKeyColumns(columns), name },
+      constraint: {
+        columns: normalizedColumns,
+        name: options?.name ?? createPrimaryKeyName(this.table, normalizedColumns),
+      },
     })
   }
 
@@ -179,10 +184,14 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropPrimaryKey', name })
   }
 
-  addUnique(name: string, columns: string[]): void {
+  addUnique(columns: KeyColumns, options?: NamedConstraintOptions): void {
+    let normalizedColumns = normalizeKeyColumns(columns)
     this.alterChanges.push({
       kind: 'addUnique',
-      constraint: { columns: [...columns], name },
+      constraint: {
+        columns: normalizedColumns,
+        name: options?.name ?? createUniqueName(this.table, normalizedColumns),
+      },
     })
   }
 
@@ -191,21 +200,25 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
   }
 
   addForeignKey(
-    name: string,
     columns: KeyColumns,
     refTable: TableInput,
     refColumns?: KeyColumns,
-    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: ForeignKeyOptions,
   ): void {
+    let normalizedColumns = normalizeKeyColumns(columns)
+    let normalizedReferenceColumns = refColumns ? normalizeKeyColumns(refColumns) : ['id']
+    let referenceTable = asTableRef(refTable)
     this.alterChanges.push({
       kind: 'addForeignKey',
       constraint: {
-        columns: normalizeKeyColumns(columns),
+        columns: normalizedColumns,
         references: {
-          table: asTableRef(refTable),
-          columns: refColumns ? normalizeKeyColumns(refColumns) : ['id'],
+          table: referenceTable,
+          columns: normalizedReferenceColumns,
         },
-        name,
+        name:
+          options?.name ??
+          createForeignKeyName(this.table, normalizedColumns, referenceTable, normalizedReferenceColumns),
         onDelete: options?.onDelete,
         onUpdate: options?.onUpdate,
       },
@@ -216,10 +229,13 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropForeignKey', name })
   }
 
-  addCheck(name: string, expression: string): void {
+  addCheck(expression: string, options?: NamedConstraintOptions): void {
     this.alterChanges.push({
       kind: 'addCheck',
-      constraint: { expression, name },
+      constraint: {
+        expression,
+        name: options?.name ?? createCheckName(this.table, expression),
+      },
     })
   }
 
@@ -228,18 +244,20 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
   }
 
   addIndex(
-    name: string,
     columns: string | string[],
-    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+    options?: CreateIndexOptions,
   ): void {
+    let normalizedColumns = normalizeIndexColumns(columns)
+    let { name, ifNotExists, ...indexOptions } = options ?? {}
     this.extraStatements.push({
       kind: 'createIndex',
       index: {
         table: this.table,
-        name,
-        columns: normalizeIndexColumns(columns),
-        ...options,
+        name: name ?? createIndexName(this.table, normalizedColumns),
+        columns: normalizedColumns,
+        ...indexOptions,
       },
+      ifNotExists,
     })
   }
 
@@ -285,7 +303,7 @@ export function createSchemaApi(
       }
     },
     async renameTable(from, to) {
-      await emit({ kind: 'renameTable', from: asTableRef(from), to: asTableRef(to) })
+      await emit({ kind: 'renameTable', from: asTableRef(from), to: toTableRef(to) })
     },
     async dropTable(table, options) {
       await emit({
@@ -295,15 +313,19 @@ export function createSchemaApi(
         cascade: options?.cascade,
       })
     },
-    async createIndex(table, name, columns, options) {
+    async createIndex(table, columns, options) {
+      let tableRef = asTableRef(table)
+      let normalizedColumns = normalizeIndexColumns(columns)
+      let { name, ifNotExists, ...indexOptions } = options ?? {}
       await emit({
         kind: 'createIndex',
         index: {
-          table: asTableRef(table),
-          name,
-          columns: normalizeIndexColumns(columns),
-          ...options,
+          table: tableRef,
+          name: name ?? createIndexName(tableRef, normalizedColumns),
+          columns: normalizedColumns,
+          ...indexOptions,
         },
+        ifNotExists,
       })
     },
     async dropIndex(table, name, options) {
@@ -322,17 +344,23 @@ export function createSchemaApi(
         to,
       })
     },
-    async addForeignKey(table, name, columns, refTable, refColumns, options) {
+    async addForeignKey(table, columns, refTable, refColumns, options) {
+      let tableRef = asTableRef(table)
+      let normalizedColumns = normalizeKeyColumns(columns)
+      let referenceTable = asTableRef(refTable)
+      let normalizedReferenceColumns = refColumns ? normalizeKeyColumns(refColumns) : ['id']
       await emit({
         kind: 'addForeignKey',
-        table: asTableRef(table),
+        table: tableRef,
         constraint: {
-          columns: normalizeKeyColumns(columns),
+          columns: normalizedColumns,
           references: {
-            table: asTableRef(refTable),
-            columns: refColumns ? normalizeKeyColumns(refColumns) : ['id'],
+            table: referenceTable,
+            columns: normalizedReferenceColumns,
           },
-          name,
+          name:
+            options?.name ??
+            createForeignKeyName(tableRef, normalizedColumns, referenceTable, normalizedReferenceColumns),
           onDelete: options?.onDelete,
           onUpdate: options?.onUpdate,
         },
@@ -345,13 +373,14 @@ export function createSchemaApi(
         name,
       })
     },
-    async addCheck(table, name, expression) {
+    async addCheck(table, expression, options) {
+      let tableRef = asTableRef(table)
       await emit({
         kind: 'addCheck',
-        table: asTableRef(table),
+        table: tableRef,
         constraint: {
           expression,
-          name,
+          name: options?.name ?? createCheckName(tableRef, expression),
         },
       })
     },
@@ -370,22 +399,10 @@ export function createSchemaApi(
       })
     },
     async hasTable(table) {
-      let tableName = asTableName(table)
-      try {
-        await db.exec(rawSql('select 1 from ' + tableName + ' limit 1'))
-        return true
-      } catch {
-        return false
-      }
+      return db.adapter.hasTable(asTableRef(table))
     },
     async hasColumn(table, columnName) {
-      let tableName = asTableName(table)
-      try {
-        await db.exec(rawSql('select ' + columnName + ' from ' + tableName + ' where 1 = 0'))
-        return true
-      } catch {
-        return false
-      }
+      return db.adapter.hasColumn(asTableRef(table), columnName)
     },
   }
 }

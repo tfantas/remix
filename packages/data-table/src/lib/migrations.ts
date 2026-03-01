@@ -185,6 +185,29 @@ export type KeyColumns = string | string[]
 export type TableInput = string | AnyTable
 
 /**
+ * Optional name override for constraints and indexes.
+ */
+export type NamedConstraintOptions = {
+  name?: string
+}
+
+/**
+ * Foreign key options for migration APIs.
+ */
+export type ForeignKeyOptions = NamedConstraintOptions & {
+  onDelete?: ForeignKeyAction
+  onUpdate?: ForeignKeyAction
+}
+
+/**
+ * Index options for migration APIs.
+ */
+export type CreateIndexOptions = NamedConstraintOptions &
+  Omit<IndexDefinition, 'table' | 'name' | 'columns'> & {
+    ifNotExists?: boolean
+  }
+
+/**
  * Builder API available inside `db.alterTable(name, table => ...)`.
  */
 export interface AlterTableBuilder {
@@ -192,24 +215,22 @@ export interface AlterTableBuilder {
   changeColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
   renameColumn(from: string, to: string): void
   dropColumn(name: string, options?: { ifExists?: boolean }): void
-  addPrimaryKey(name: string, columns: KeyColumns): void
+  addPrimaryKey(columns: KeyColumns, options?: NamedConstraintOptions): void
   dropPrimaryKey(name: string): void
-  addUnique(name: string, columns: string[]): void
+  addUnique(columns: KeyColumns, options?: NamedConstraintOptions): void
   dropUnique(name: string): void
   addForeignKey(
-    name: string,
     columns: KeyColumns,
     refTable: TableInput,
     refColumns?: KeyColumns,
-    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: ForeignKeyOptions,
   ): void
   dropForeignKey(name: string): void
-  addCheck(name: string, expression: string): void
+  addCheck(expression: string, options?: NamedConstraintOptions): void
   dropCheck(name: string): void
   addIndex(
-    name: string,
     columns: IndexColumns,
-    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+    options?: CreateIndexOptions,
   ): void
   dropIndex(name: string): void
   comment(text: string): void
@@ -225,26 +246,24 @@ export interface MigrationOperations {
     migrate: (table: AlterTableBuilder) => void,
     options?: AlterTableOptions,
   ): Promise<void>
-  renameTable(from: TableInput, to: TableInput): Promise<void>
+  renameTable(from: TableInput, to: string): Promise<void>
   dropTable(table: TableInput, options?: DropTableOptions): Promise<void>
   createIndex(
     table: TableInput,
-    name: string,
     columns: IndexColumns,
-    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
+    options?: CreateIndexOptions,
   ): Promise<void>
   dropIndex(table: TableInput, name: string, options?: { ifExists?: boolean }): Promise<void>
   renameIndex(table: TableInput, from: string, to: string): Promise<void>
   addForeignKey(
     table: TableInput,
-    name: string,
     columns: KeyColumns,
     refTable: TableInput,
     refColumns?: KeyColumns,
-    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: ForeignKeyOptions,
   ): Promise<void>
   dropForeignKey(table: TableInput, name: string): Promise<void>
-  addCheck(table: TableInput, name: string, expression: string): Promise<void>
+  addCheck(table: TableInput, expression: string, options?: NamedConstraintOptions): Promise<void>
   dropCheck(table: TableInput, name: string): Promise<void>
   /**
    * Adds raw SQL to the migration plan as a migration operation.

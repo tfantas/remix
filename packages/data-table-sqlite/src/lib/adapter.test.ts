@@ -75,6 +75,56 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
     assert.equal(prepareCalls, 0)
   })
 
+  it('checks table and column existence through adapter introspection hooks', async () => {
+    let preparedStatements: string[] = []
+
+    let sqlite = {
+      prepare(statement: string) {
+        preparedStatements.push(statement)
+
+        if (statement.includes('sqlite_master')) {
+          return {
+            get() {
+              return { exists: 1 }
+            },
+            all() {
+              return []
+            },
+            run() {
+              return { changes: 0, lastInsertRowid: 0 }
+            },
+          }
+        }
+
+        return {
+          get() {
+            return undefined
+          },
+          all() {
+            return [{ name: 'id' }, { name: 'email' }]
+          },
+          run() {
+            return { changes: 0, lastInsertRowid: 0 }
+          },
+        }
+      },
+      exec() {},
+      pragma() {},
+    }
+
+    let adapter = createSqliteDatabaseAdapter(sqlite as never)
+    let hasTable = await adapter.hasTable({ name: 'users' })
+    let hasColumn = await adapter.hasColumn({ schema: 'app', name: 'users' }, 'email')
+
+    assert.equal(hasTable, true)
+    assert.equal(hasColumn, true)
+    assert.equal(
+      preparedStatements[0],
+      'select 1 from sqlite_master where type = ? and name = ? limit 1',
+    )
+    assert.equal(preparedStatements[1], 'pragma "app".table_info("users")')
+  })
+
   it('enables read uncommitted pragma for read-uncommitted transactions', async () => {
     let pragmas: string[] = []
     let execs: string[] = []

@@ -71,6 +71,37 @@ describe('mysql adapter', () => {
     })
   })
 
+  it('checks table and column existence through adapter introspection hooks', async () => {
+    let statements: Array<{ text: string; values: unknown[] | undefined }> = []
+
+    let connection = {
+      async query(text: string, values?: unknown[]) {
+        statements.push({ text, values })
+        return [[{ exists: 1 }], []]
+      },
+      async beginTransaction() {},
+      async commit() {},
+      async rollback() {},
+    }
+
+    let adapter = createMysqlDatabaseAdapter(connection as never)
+    let hasTable = await adapter.hasTable({ schema: 'app', name: 'users' })
+    let hasColumn = await adapter.hasColumn({ name: 'users' }, 'email')
+
+    assert.equal(hasTable, true)
+    assert.equal(hasColumn, true)
+    assert.equal(
+      statements[0]?.text,
+      'select exists(select 1 from information_schema.tables where table_schema = ? and table_name = ?) as `exists`',
+    )
+    assert.deepEqual(statements[0]?.values, ['app', 'users'])
+    assert.equal(
+      statements[1]?.text,
+      'select exists(select 1 from information_schema.columns where table_schema = database() and table_name = ? and column_name = ?) as `exists`',
+    )
+    assert.deepEqual(statements[1]?.values, ['users', 'email'])
+  })
+
   it('short-circuits insertMany([]) and returns empty rows for returning queries', async () => {
     let calls = 0
 

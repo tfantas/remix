@@ -102,6 +102,12 @@ function createDryRunDatabase(adapter: DatabaseAdapter): DataManipulationDatabas
     compileSql(operation) {
       return adapter.compileSql(operation)
     },
+    async hasTable() {
+      return false
+    },
+    async hasColumn() {
+      return false
+    },
     execute: throwDryRunError,
     migrate: throwDryRunError,
     beginTransaction: throwDryRunError,

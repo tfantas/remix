@@ -74,6 +74,43 @@ describe('postgres adapter', () => {
     })
   })
 
+  it('checks table and column existence through adapter introspection hooks', async () => {
+    let statements: Array<{ text: string; values: unknown[] | undefined }> = []
+
+    let client = {
+      async query(text: string, values?: unknown[]) {
+        statements.push({ text, values })
+
+        if (text.includes('pg_attribute')) {
+          return {
+            rows: [{ exists: 't' }],
+            rowCount: 1,
+          }
+        }
+
+        return {
+          rows: [{ exists: true }],
+          rowCount: 1,
+        }
+      },
+    }
+
+    let adapter = createPostgresDatabaseAdapter(client as never)
+    let hasTable = await adapter.hasTable({ schema: 'app', name: 'users' })
+    let hasColumn = await adapter.hasColumn({ schema: 'app', name: 'users' }, 'email')
+
+    assert.equal(hasTable, true)
+    assert.equal(hasColumn, true)
+    assert.equal(statements[0]?.text, 'select to_regclass($1) is not null as "exists"')
+    assert.equal(statements[0]?.values?.[0], '"app"."users"')
+    assert.equal(
+      statements[1]?.text,
+      'select exists (select 1 from pg_attribute where attrelid = to_regclass($1) and attname = $2 and attnum > 0 and not attisdropped) as "exists"',
+    )
+    assert.equal(statements[1]?.values?.[0], '"app"."users"')
+    assert.equal(statements[1]?.values?.[1], 'email')
+  })
+
   it('short-circuits insertMany([]) and returns empty rows for returning queries', async () => {
     let calls = 0
 

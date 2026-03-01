@@ -113,6 +113,25 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
+  async hasTable(table: TableRef): Promise<boolean> {
+    let masterTable = table.schema ? quoteIdentifier(table.schema) + '.sqlite_master' : 'sqlite_master'
+    let statement = this.#database.prepare(
+      'select 1 from ' + masterTable + ' where type = ? and name = ? limit 1',
+    )
+    let row = statement.get('table', table.name)
+    return row !== undefined
+  }
+
+  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+    let schemaPrefix = table.schema ? quoteIdentifier(table.schema) + '.' : ''
+    let statement = this.#database.prepare(
+      'pragma ' + schemaPrefix + 'table_info(' + quoteIdentifier(table.name) + ')',
+    )
+    let rows = statement.all() as Array<Record<string, unknown>>
+
+    return rows.some((row) => row.name === column)
+  }
+
   async beginTransaction(options?: TransactionOptions): Promise<TransactionToken> {
     if (options?.isolationLevel === 'read uncommitted') {
       this.#database.pragma('read_uncommitted = true')

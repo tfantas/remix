@@ -149,6 +149,36 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
+  async hasTable(table: TableRef): Promise<boolean> {
+    let schema = table.schema
+    let sql = schema
+      ? 'select exists(select 1 from information_schema.tables where table_schema = ? and table_name = ?) as `exists`'
+      : 'select exists(select 1 from information_schema.tables where table_schema = database() and table_name = ?) as `exists`'
+    let values = schema ? [schema, table.name] : [table.name]
+    let [result] = await this.#client.query(sql, values)
+
+    if (!isRowsResult(result)) {
+      return false
+    }
+
+    return toBooleanExists(result[0]?.exists)
+  }
+
+  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+    let schema = table.schema
+    let sql = schema
+      ? 'select exists(select 1 from information_schema.columns where table_schema = ? and table_name = ? and column_name = ?) as `exists`'
+      : 'select exists(select 1 from information_schema.columns where table_schema = database() and table_name = ? and column_name = ?) as `exists`'
+    let values = schema ? [schema, table.name, column] : [table.name, column]
+    let [result] = await this.#client.query(sql, values)
+
+    if (!isRowsResult(result)) {
+      return false
+    }
+
+    return toBooleanExists(result[0]?.exists)
+  }
+
   async beginTransaction(options?: TransactionOptions): Promise<TransactionToken> {
     let releaseOnClose = false
     let connection: MysqlDatabaseConnection
@@ -290,6 +320,26 @@ function isMysqlPool(client: MysqlQueryable): client is MysqlDatabasePool {
 
 function isRowsResult(result: unknown): result is MysqlQueryRows {
   return Array.isArray(result) && (result.length === 0 || !Array.isArray(result[0]))
+}
+
+function toBooleanExists(value: unknown): boolean {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value > 0
+  }
+
+  if (typeof value === 'bigint') {
+    return value > 0n
+  }
+
+  if (typeof value === 'string') {
+    return value === '1' || value.toLowerCase() === 'true'
+  }
+
+  return false
 }
 
 function normalizeRows(rows: MysqlQueryRows): Record<string, unknown>[] {
