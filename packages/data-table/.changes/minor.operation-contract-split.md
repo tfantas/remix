@@ -1,4 +1,4 @@
-BREAKING CHANGE: Replace the existing adapter contract naming/shape with operation-based contracts
+BREAKING CHANGE: Rename adapter operation contract names/fields
 (`AdapterStatement` -> `DataManipulationOperation`, `statement` -> `operation`).
 
 Add separate adapter execution methods for DML and migration/DDL operations:
