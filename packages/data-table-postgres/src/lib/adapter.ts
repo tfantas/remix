@@ -20,7 +20,7 @@ import {
   quoteTableRef as quoteTableRefHelper,
 } from '@remix-run/data-table/sql-helpers'
 
-import { compilePostgresStatement } from './sql-compiler.ts'
+import { compilePostgresOperation } from './sql-compiler.ts'
 
 type Pretty<value> = {
   [key in keyof value]: value[key]
@@ -95,7 +95,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
 
   compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
-      let compiled = compilePostgresStatement(operation)
+      let compiled = compilePostgresOperation(operation)
       return [{ text: compiled.text, values: compiled.values }]
     }
 
@@ -111,7 +111,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
       }
     }
 
-    let statement = compilePostgresStatement(request.operation)
+    let statement = compilePostgresOperation(request.operation)
     let client = this.#resolveClient(request.transaction)
     let result = await client.query(statement.text, statement.values)
     let rows = normalizeRows(result.rows)

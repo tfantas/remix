@@ -14,7 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileMysqlStatement(
+export function compileMysqlOperation(
   operation: DataManipulationOperation,
 ): SqlStatement {
   if (operation.kind === 'raw') {
@@ -109,7 +109,7 @@ export function compileMysqlStatement(
     return compileUpsertStatement(operation, context)
   }
 
-  throw new Error('Unsupported statement kind')
+  throw new Error('Unsupported operation kind')
 }
 
 function compileInsertStatement(

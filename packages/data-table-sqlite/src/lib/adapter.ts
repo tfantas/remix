@@ -21,7 +21,7 @@ import {
 } from '@remix-run/data-table/sql-helpers'
 import type { Database as BetterSqliteDatabase, RunResult } from 'better-sqlite3'
 
-import { compileSqliteStatement } from './sql-compiler.ts'
+import { compileSqliteOperation } from './sql-compiler.ts'
 
 /**
  * Better SQLite3 database handle accepted by the sqlite adapter.
@@ -59,7 +59,7 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
 
   compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
-      let compiled = compileSqliteStatement(operation)
+      let compiled = compileSqliteOperation(operation)
       return [{ text: compiled.text, values: compiled.values }]
     }
 

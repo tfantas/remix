@@ -20,7 +20,7 @@ import {
   quoteTableRef as quoteTableRefHelper,
 } from '@remix-run/data-table/sql-helpers'
 
-import { compileMysqlStatement } from './sql-compiler.ts'
+import { compileMysqlOperation } from './sql-compiler.ts'
 
 /**
  * Row-array response shape for mysql query calls.
@@ -97,7 +97,7 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
 
   compileSql(operation: DataManipulationOperation | DataMigrationOperation): SqlStatement[] {
     if (isDataManipulationOperation(operation)) {
-      let compiled = compileMysqlStatement(operation)
+      let compiled = compileMysqlOperation(operation)
       return [{ text: compiled.text, values: compiled.values }]
     }
 

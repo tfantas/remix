@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { rawSql } from './sql.ts'
+import { rawSql, sql } from './sql.ts'
 import type {
   DataManipulationRequest,
   DataMigrationRequest,
@@ -337,6 +337,7 @@ describe('migration runner', () => {
 
         await db.renameIndex('app.users', 'users_status_idx', 'users_status_idx_v2')
         await db.raw('vacuum')
+        await db.raw(sql`select ${123}`)
       },
       async down() {},
     })
@@ -347,7 +348,7 @@ describe('migration runner', () => {
 
     assert.deepEqual(
       adapter.migratedOperations.map((operation) => operation.kind),
-      ['createTable', 'createIndex', 'alterTable', 'createIndex', 'renameIndex', 'raw'],
+      ['createTable', 'createIndex', 'alterTable', 'createIndex', 'renameIndex', 'raw', 'raw'],
     )
 
     let createTableOperation = adapter.migratedOperations[0]
@@ -366,9 +367,13 @@ describe('migration runner', () => {
     assert.equal(alterIndexOperation.kind, 'createIndex')
     assert.deepEqual(alterIndexOperation.index.columns, ['status'])
 
-    let rawOperation = adapter.migratedOperations[5]
-    assert.equal(rawOperation.kind, 'raw')
-    assert.deepEqual(rawOperation.sql, rawSql('vacuum'))
+    let rawStringOperation = adapter.migratedOperations[5]
+    assert.equal(rawStringOperation.kind, 'raw')
+    assert.deepEqual(rawStringOperation.sql, rawSql('vacuum'))
+
+    let rawStatementOperation = adapter.migratedOperations[6]
+    assert.equal(rawStatementOperation.kind, 'raw')
+    assert.deepEqual(rawStatementOperation.sql, sql`select ${123}`)
   })
 
   it('applies, reverts by step, and reverts by target', async () => {
@@ -522,6 +527,10 @@ describe('migration runner', () => {
 
     await assert.rejects(() => runner.up({ to: '99999999999999' }), /Unknown migration target/)
     await assert.rejects(() => runner.up({ step: 0 }), /positive integer/)
+    await assert.rejects(
+      () => runner.up({ to: '20260101000000', step: 1 } as never),
+      /Cannot combine "to" and "step"/,
+    )
   })
 
   it('supports up() target and step boundaries', async () => {

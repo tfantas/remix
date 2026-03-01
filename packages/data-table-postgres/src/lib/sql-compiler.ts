@@ -14,7 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compilePostgresStatement(
+export function compilePostgresOperation(
   operation: DataManipulationOperation,
 ): SqlStatement {
   if (operation.kind === 'raw') {
@@ -116,7 +116,7 @@ export function compilePostgresStatement(
     return compileUpsertStatement(operation, context)
   }
 
-  throw new Error('Unsupported statement kind')
+  throw new Error('Unsupported operation kind')
 }
 
 function compileInsertStatement(

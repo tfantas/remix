@@ -1,7 +1,7 @@
 export type {
   AlterTableBuilder,
+  Database,
   CreateMigrationInput,
-  MigrationDatabase,
   Migration,
   MigrationContext,
   MigrationDescriptor,
@@ -17,7 +17,6 @@ export type {
   MigrateOptions,
   MigrateResult,
 } from './lib/migrations.ts'
-export type { MigrationDatabase as Database } from './lib/migrations.ts'
 export {
   createMigration,
 } from './lib/migrations.ts'

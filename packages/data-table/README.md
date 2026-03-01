@@ -379,11 +379,21 @@ await runner.up({ step: 1 })
 await runner.down({ step: 1 })
 ```
 
+`to` and `step` are mutually exclusive. Use one or the other for a given run.
+
 Use `dryRun` to compile and inspect the SQL plan without applying migrations:
 
 ```ts
 let dryRunResult = await runner.up({ dryRun: true })
 console.log(dryRunResult.sql)
+```
+
+You can also pass a pre-built SQL statement into `db.raw(...)` when authoring migrations:
+
+```ts
+import { sql } from 'remix/data-table'
+
+await db.raw(sql`update users set status = ${'active'} where status is null`)
 ```
 
 This is useful when you want to:

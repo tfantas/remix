@@ -1,11 +1,11 @@
 import { createDatabase } from '../database.ts'
-import type { Database } from '../database.ts'
+import type { Database as DataManipulationDatabase } from '../database.ts'
 import type { DatabaseAdapter, TransactionToken } from '../adapter.ts'
 import type {
+  Database as MigrationsDatabase,
   MigrateOptions,
   MigrateResult,
   MigrationContext,
-  MigrationDatabase,
   MigrationDescriptor,
   MigrationDirection,
   MigrationJournalRow,
@@ -43,6 +43,12 @@ function assertStepOption(step: number | undefined): void {
 
   if (!Number.isInteger(step) || step < 1) {
     throw new Error('Invalid migration step option. Expected a positive integer.')
+  }
+}
+
+function assertMigrateOptions(options: MigrateOptions): void {
+  if (options.to !== undefined && options.step !== undefined) {
+    throw new Error('Cannot combine "to" and "step" migration options in the same run')
   }
 }
 
@@ -84,7 +90,7 @@ function assertNoMigrationDrift(migrations: MigrationDescriptor[], journal: Migr
   }
 }
 
-function createDryRunDatabase(adapter: DatabaseAdapter): Database {
+function createDryRunDatabase(adapter: DatabaseAdapter): DataManipulationDatabase {
   let error = new Error('Cannot execute data operations while running migrations with dryRun')
   let throwDryRunError = async (): Promise<never> => {
     throw error
@@ -116,6 +122,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
   let target = input.options.to
   let step = input.options.step
 
+  assertMigrateOptions(input.options)
   assertStepOption(step)
   assertTargetOption(migrations, target)
 
@@ -199,7 +206,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
           await adapter.migrate({ operation, transaction: token })
         }
       })
-      let migrationDb: MigrationDatabase = Object.assign(db, migrationOperations)
+      let migrationDb: MigrationsDatabase = Object.assign(db, migrationOperations)
 
       let context: MigrationContext = {
         dialect: adapter.dialect,

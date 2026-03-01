@@ -1,10 +1,11 @@
-import type { Database } from './database.ts'
+import type { Database as DataManipulationDatabase } from './database.ts'
 import type {
   ColumnDefinition,
   ForeignKeyAction,
   IndexDefinition,
 } from './adapter.ts'
 import type { ColumnBuilder } from './column.ts'
+import type { SqlStatement } from './sql.ts'
 import type { AnyTable } from './table.ts'
 
 /**
@@ -15,14 +16,14 @@ export type MigrationTransactionMode = 'auto' | 'required' | 'none'
 /**
  * Database API available inside migrations.
  */
-export type MigrationDatabase = Database & MigrationOperations
+export type Database = DataManipulationDatabase & MigrationOperations
 
 /**
  * Runtime context passed to migration `up`/`down` handlers.
  */
 export type MigrationContext = {
   dialect: string
-  db: MigrationDatabase
+  db: Database
 }
 
 /**
@@ -124,12 +125,24 @@ export type MigrationStatusEntry = {
 
 /**
  * Common options for `runner.up(...)` and `runner.down(...)`.
+ * `to` and `step` are mutually exclusive.
  */
-export type MigrateOptions = {
-  to?: string
-  step?: number
-  dryRun?: boolean
-}
+export type MigrateOptions =
+  | {
+      to: string
+      step?: never
+      dryRun?: boolean
+    }
+  | {
+      to?: never
+      step: number
+      dryRun?: boolean
+    }
+  | {
+      to?: undefined
+      step?: undefined
+      dryRun?: boolean
+    }
 
 /**
  * Result shape returned by migration runner commands.
@@ -219,7 +232,7 @@ export interface MigrationOperations {
   dropForeignKey(table: string, name: string): Promise<void>
   addCheck(table: string, name: string, expression: string): Promise<void>
   dropCheck(table: string, name: string): Promise<void>
-  raw(sql: string): Promise<void>
+  raw(sql: string | SqlStatement): Promise<void>
   tableExists(name: string): Promise<boolean>
   columnExists(table: string, column: string): Promise<boolean>
 }

@@ -14,7 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileSqliteStatement(
+export function compileSqliteOperation(
   operation: DataManipulationOperation,
 ): SqlStatement {
   if (operation.kind === 'raw') {
@@ -116,7 +116,7 @@ export function compileSqliteStatement(
     return compileUpsertStatement(operation, context)
   }
 
-  throw new Error('Unsupported statement kind')
+  throw new Error('Unsupported operation kind')
 }
 
 function compileInsertStatement(
