@@ -655,7 +655,7 @@ describe('mysql adapter', () => {
     await adapter.acquireMigrationLock()
     await adapter.releaseMigrationLock()
 
-    assert.equal(result.affectedObjects, 1)
+    assert.equal(result.affectedOperations, 1)
     assert.deepEqual(statements[0], {
       text: "alter table `accounts` comment = 'owner''s table'",
       values: [],
@@ -890,7 +890,7 @@ describe('mysql adapter', () => {
     )
   })
 
-  it('compiles every DDL statement kind through compileSql()', () => {
+  it('compiles every DDL operation kind through compileSql()', () => {
     let adapter = createMysqlDatabaseAdapter({
       async query() {
         return [[], []]

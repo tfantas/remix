@@ -127,7 +127,7 @@ type SavepointCounter = {
   value: number
 }
 
-const executeStatement = Symbol('executeStatement')
+const executeOperation = Symbol('executeOperation')
 
 type RelationMapForSourceName<tableName extends string> = Record<
   string,
@@ -737,7 +737,7 @@ class DatabaseRuntime implements Database {
   async exec(statement: string | SqlStatement, values: unknown[] = []): Promise<DataManipulationResult> {
     let sqlStatement = isSqlStatement(statement) ? statement : rawSql(statement, values)
 
-    return this[executeStatement]({
+    return this[executeOperation]({
       kind: 'raw',
       sql: sqlStatement,
     })
@@ -786,7 +786,7 @@ class DatabaseRuntime implements Database {
     }
   }
 
-  async [executeStatement](operation: DataManipulationOperation): Promise<DataManipulationResult> {
+  async [executeOperation](operation: DataManipulationOperation): Promise<DataManipulationResult> {
     try {
       return await this.#adapter.execute({
         operation,
@@ -797,7 +797,7 @@ class DatabaseRuntime implements Database {
         cause: error,
         metadata: {
           dialect: this.#adapter.dialect,
-          statementKind: operation.kind,
+          operationKind: operation.kind,
         },
       })
     }
@@ -1112,8 +1112,8 @@ export class QueryBuilder<
    * @returns All matching rows with requested eager-loaded relations.
    */
   async all(): Promise<Array<row & loaded>> {
-    let operation = this.#toSelectStatement()
-    let result = await this.#database[executeStatement](operation)
+    let operation = this.#toSelectOperation()
+    let result = await this.#database[executeOperation](operation)
     let rows = normalizeRows(result.rows)
 
     if (Object.keys(this.#state.with).length === 0) {
@@ -1162,7 +1162,7 @@ export class QueryBuilder<
       having: [...this.#state.having],
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
 
     if (result.rows && result.rows[0] && typeof result.rows[0].count === 'number') {
       return result.rows[0].count as number
@@ -1189,7 +1189,7 @@ export class QueryBuilder<
       having: [...this.#state.having],
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
 
     if (result.rows && result.rows[0] && typeof result.rows[0].exists === 'boolean') {
       return result.rows[0].exists as boolean
@@ -1239,7 +1239,7 @@ export class QueryBuilder<
         returning: normalizeReturningSelection(returning),
       }
 
-      let result = await this.#database[executeStatement](operation)
+      let result = await this.#database[executeOperation](operation)
       let row = (normalizeRows(result.rows)[0] ?? null) as row | null
 
       return {
@@ -1255,7 +1255,7 @@ export class QueryBuilder<
       values: preparedValues,
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
     let metadata: WriteResult = {
       affectedRows: result.affectedRows ?? 0,
       insertId: result.insertId,
@@ -1308,7 +1308,7 @@ export class QueryBuilder<
         returning: normalizeReturningSelection(returning),
       }
 
-      let result = await this.#database[executeStatement](operation)
+      let result = await this.#database[executeOperation](operation)
 
       return {
         affectedRows: result.affectedRows ?? 0,
@@ -1323,7 +1323,7 @@ export class QueryBuilder<
       values: preparedValues,
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
     let metadata: WriteResult = {
       affectedRows: result.affectedRows ?? 0,
       insertId: result.insertId,
@@ -1399,7 +1399,7 @@ export class QueryBuilder<
       returning: returning ? normalizeReturningSelection(returning) : undefined,
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
 
     if (!returning) {
       return {
@@ -1468,7 +1468,7 @@ export class QueryBuilder<
       returning: returning ? normalizeReturningSelection(returning) : undefined,
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
 
     if (!returning) {
       return {
@@ -1542,7 +1542,7 @@ export class QueryBuilder<
         returning: normalizeReturningSelection(returning),
       }
 
-      let result = await this.#database[executeStatement](operation)
+      let result = await this.#database[executeOperation](operation)
       let row = (normalizeRows(result.rows)[0] ?? null) as row | null
 
       return {
@@ -1560,7 +1560,7 @@ export class QueryBuilder<
       update: updateChanges,
     }
 
-    let result = await this.#database[executeStatement](operation)
+    let result = await this.#database[executeOperation](operation)
     let metadata: WriteResult = {
       affectedRows: result.affectedRows ?? 0,
       insertId: result.insertId,
@@ -1569,7 +1569,7 @@ export class QueryBuilder<
     return metadata
   }
 
-  #toSelectStatement(): SelectOperation<AnyTable> {
+  #toSelectOperation(): SelectOperation<AnyTable> {
     return {
       kind: 'select',
       table: this.#table,

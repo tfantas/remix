@@ -32,7 +32,7 @@ import { createSchemaApi } from './schema-api.ts'
 type RunMigrationsInput = {
   adapter: DatabaseAdapter
   migrations: MigrationDescriptor[]
-  tableName: string
+  journalTable: string
   direction: MigrationDirection
   options: MigrateOptions
 }
@@ -118,7 +118,7 @@ function createDryRunDatabase(adapter: DatabaseAdapter): DataManipulationDatabas
 async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> {
   let adapter = input.adapter
   let migrations = input.migrations
-  let tableName = input.tableName
+  let journalTable = input.journalTable
   let dryRun = Boolean(input.options.dryRun)
   let target = input.options.to
   let step = input.options.step
@@ -135,14 +135,14 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
     let journal: MigrationJournalRow[] = []
 
     if (dryRun) {
-      let canReadJournal = await hasMigrationJournal(adapter, tableName)
+      let canReadJournal = await hasMigrationJournal(adapter, journalTable)
 
       if (canReadJournal) {
-        journal = await loadJournalRows(adapter, tableName)
+        journal = await loadJournalRows(adapter, journalTable)
       }
     } else {
-      await ensureMigrationJournal(adapter, tableName)
-      journal = await loadJournalRows(adapter, tableName)
+      await ensureMigrationJournal(adapter, journalTable)
+      journal = await loadJournalRows(adapter, journalTable)
     }
 
     let appliedMap = new Map(journal.map((row) => [row.id, row]))
@@ -221,7 +221,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
           if (!dryRun) {
             await insertJournalRow(
               adapter,
-              tableName,
+              journalTable,
               {
                 id: migration.id,
                 name: migration.name,
@@ -241,7 +241,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
           await migration.migration.down(context)
 
           if (!dryRun) {
-            await deleteJournalRow(adapter, tableName, migration.id, token)
+            await deleteJournalRow(adapter, journalTable, migration.id, token)
           }
 
           reverted.push({
@@ -292,14 +292,14 @@ export function createMigrationRunner(
   migrations: MigrationDescriptor[] | MigrationRegistry,
   options: MigrationRunnerOptions = {},
 ): MigrationRunner {
-  let tableName = options.tableName ?? 'data_table_migrations'
+  let journalTable = options.journalTable ?? 'data_table_migrations'
 
   return {
     async up(runOptions: MigrateOptions = {}): Promise<MigrateResult> {
       return runMigrations({
         adapter,
         migrations: resolveMigrations(migrations),
-        tableName,
+        journalTable,
         direction: 'up',
         options: runOptions,
       })
@@ -308,15 +308,15 @@ export function createMigrationRunner(
       return runMigrations({
         adapter,
         migrations: resolveMigrations(migrations),
-        tableName,
+        journalTable,
         direction: 'down',
         options: runOptions,
       })
     },
     async status(): Promise<MigrationStatusEntry[]> {
-      await ensureMigrationJournal(adapter, tableName)
+      await ensureMigrationJournal(adapter, journalTable)
 
-      let journal = await loadJournalRows(adapter, tableName)
+      let journal = await loadJournalRows(adapter, journalTable)
       let journalMap = new Map(journal.map((row) => [row.id, row]))
       let sortedMigrations = resolveMigrations(migrations)
 

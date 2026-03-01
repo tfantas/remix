@@ -475,7 +475,7 @@ export type DataManipulationResult = {
  * Adapter data-migration result payload.
  */
 export type DataMigrationResult = {
-  affectedObjects?: number
+  affectedOperations?: number
 }
 
 /**

@@ -119,7 +119,7 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
       operation.table.schema === undefined
     ) {
       this.journalTableCreated = true
-      return { affectedObjects: 1 }
+      return { affectedOperations: 1 }
     }
 
     if (this.failOnMigrateKind && operation.kind === this.failOnMigrateKind) {
@@ -127,7 +127,7 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
     }
 
     this.migratedOperations.push(operation)
-    return { affectedObjects: 1 }
+    return { affectedOperations: 1 }
   }
 
   async beginTransaction(): Promise<TransactionToken> {

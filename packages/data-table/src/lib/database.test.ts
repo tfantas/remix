@@ -439,7 +439,7 @@ describe('query builder', () => {
   })
 
   it('does not pre-read when update helper uses RETURNING', async () => {
-    let statementKinds: string[] = []
+    let operationKinds: string[] = []
 
     let adapter: DatabaseAdapter = {
       dialect: 'fake',
@@ -451,7 +451,7 @@ describe('query builder', () => {
         migrationLock: false,
       },
       async execute(request) {
-        statementKinds.push(request.operation.kind)
+        operationKinds.push(request.operation.kind)
 
         if (request.operation.kind === 'update') {
           return {
@@ -466,7 +466,7 @@ describe('query builder', () => {
           }
         }
 
-        throw new Error('unexpected statement kind: ' + request.operation.kind)
+        throw new Error('unexpected operation kind: ' + request.operation.kind)
       },
       compileSql() {
         return []
@@ -488,11 +488,11 @@ describe('query builder', () => {
     let updated = await db.update(accounts, 1, { status: 'inactive' })
 
     assert.equal(updated.id, 1)
-    assert.deepEqual(statementKinds, ['update'])
+    assert.deepEqual(operationKinds, ['update'])
   })
 
   it('does not throw on no-op updates for non-RETURNING adapters when row still exists', async () => {
-    let statementKinds: string[] = []
+    let operationKinds: string[] = []
 
     let adapter: DatabaseAdapter = {
       dialect: 'fake',
@@ -504,7 +504,7 @@ describe('query builder', () => {
         migrationLock: false,
       },
       async execute(request) {
-        statementKinds.push(request.operation.kind)
+        operationKinds.push(request.operation.kind)
 
         if (request.operation.kind === 'update') {
           return {
@@ -524,7 +524,7 @@ describe('query builder', () => {
           }
         }
 
-        throw new Error('unexpected statement kind: ' + request.operation.kind)
+        throw new Error('unexpected operation kind: ' + request.operation.kind)
       },
       compileSql() {
         return []
@@ -547,7 +547,7 @@ describe('query builder', () => {
 
     assert.equal(updated.id, 1)
     assert.equal(updated.status, 'active')
-    assert.deepEqual(statementKinds, ['update', 'select'])
+    assert.deepEqual(operationKinds, ['update', 'select'])
   })
 
   it('supports database-level updateMany helper', async () => {
@@ -1669,7 +1669,7 @@ describe('adapter errors', () => {
 
         return (
           error.metadata?.dialect === 'failing' &&
-          error.metadata?.statementKind === 'select' &&
+          error.metadata?.operationKind === 'select' &&
           error.cause instanceof Error &&
           error.cause.message === 'boom'
         )

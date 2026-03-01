@@ -705,7 +705,7 @@ describe('postgres adapter', () => {
     await adapter.releaseMigrationLock()
     await adapter.commitTransaction(token)
 
-    assert.equal(result.affectedObjects, 2)
+    assert.equal(result.affectedOperations, 2)
     assert.deepEqual(
       statements.map((statement) => statement.text),
       [
@@ -980,7 +980,7 @@ describe('postgres adapter', () => {
     )
   })
 
-  it('compiles every DDL statement kind through compileSql()', () => {
+  it('compiles every DDL operation kind through compileSql()', () => {
     let adapter = createPostgresDatabaseAdapter({
       async query() {
         return {

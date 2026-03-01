@@ -352,7 +352,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
       },
     })
 
-    assert.equal(result.affectedObjects, 1)
+    assert.equal(result.affectedOperations, 1)
     assert.deepEqual(statements[0], {
       text: 'alter table "accounts" drop constraint "accounts_status_check"',
       values: [],
@@ -691,7 +691,7 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
     sqlite.close()
   })
 
-  it('compiles every DDL statement kind through compileSql()', () => {
+  it('compiles every DDL operation kind through compileSql()', () => {
     let sqlite = {
       prepare() {
         return {

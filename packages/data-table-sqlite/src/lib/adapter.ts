@@ -109,7 +109,7 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     }
 
     return {
-      affectedObjects: statements.length,
+      affectedOperations: statements.length,
     }
   }
 
@@ -224,7 +224,7 @@ function normalizeAffectedRowsForReader(
   kind: DataManipulationRequest['operation']['kind'],
   rows: Record<string, unknown>[],
 ): number | undefined {
-  if (isWriteStatementKind(kind)) {
+  if (isWriteOperationKind(kind)) {
     return rows.length
   }
 
@@ -291,7 +291,7 @@ function quoteLiteral(value: unknown): string {
   return quoteLiteralHelper(value, { booleansAsIntegers: true })
 }
 
-function isWriteStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
+function isWriteOperationKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return (
     kind === 'insert' ||
     kind === 'insertMany' ||

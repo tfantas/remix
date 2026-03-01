@@ -249,7 +249,7 @@ export type MigrationRegistry = {
  * Options for creating a migration runner.
  */
 export type MigrationRunnerOptions = {
-  tableName?: string
+  journalTable?: string
 }
 
 /**

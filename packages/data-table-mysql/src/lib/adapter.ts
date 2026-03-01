@@ -145,7 +145,7 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     }
 
     return {
-      affectedObjects: statements.length,
+      affectedOperations: statements.length,
     }
   }
 

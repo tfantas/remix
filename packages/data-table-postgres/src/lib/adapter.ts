@@ -136,7 +136,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     }
 
     return {
-      affectedObjects: statements.length,
+      affectedOperations: statements.length,
     }
   }
 
