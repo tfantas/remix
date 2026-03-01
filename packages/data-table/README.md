@@ -7,7 +7,7 @@ Typed relational query toolkit for JavaScript runtimes.
 - **One API Across Databases**: Same query and relation APIs across PostgreSQL, MySQL, and SQLite adapters
 - **Two Complementary Query Styles**: Use the chainable query builder for advanced queries or high-level database helpers for common CRUD
 - **Type-Safe Reads**: Typed `select`, relation loading, and predicate keys
-- **Validated Writes and Filters**: Values are parsed with your `remix/data-schema` schemas
+- **Optional Runtime Validation**: Add `validate(context)` at the table level for create/update validation and coercion
 - **Relation-First Queries**: `hasMany`, `hasOne`, `belongsTo`, `hasManyThrough`, and nested eager loading
 - **Safe Scoped Writes**: `update`/`delete` with `orderBy`/`limit` run safely in a transaction
 - **First-Class Migrations**: Up/down migrations with schema builders, runner controls, and dry-run planning
@@ -18,7 +18,7 @@ Typed relational query toolkit for JavaScript runtimes.
 - [**Query Builder**](#query-builder) for expressive joins, aggregates, eager loading, and scoped writes
 - [**CRUD Helpers**](#crud-helpers) for common create/read/update/delete flows (`find`, `create`, `update`, `delete`)
 
-Both APIs are type-safe and validate values using your [remix/data-schema](https://github.com/remix-run/remix/tree/main/packages/data-schema) schemas.
+Both APIs are type-safe. Runtime validation is opt-in with table-level `validate(context)`.
 
 ## Installation
 
@@ -37,28 +37,27 @@ Define tables once, then create a database with an adapter.
 
 ```ts
 import { Pool } from 'pg'
-import * as s from 'remix/data-schema'
-import { createDatabase, table, hasMany } from 'remix/data-table'
+import { column as c, createDatabase, table, hasMany } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table-postgres'
 
 let users = table({
   name: 'users',
   columns: {
-    id: s.string(),
-    email: s.string(),
-    role: s.enum_(['customer', 'admin']),
-    created_at: s.number(),
+    id: c.uuid(),
+    email: c.varchar(255),
+    role: c.enum(['customer', 'admin']),
+    created_at: c.integer(),
   },
 })
 
 let orders = table({
   name: 'orders',
   columns: {
-    id: s.string(),
-    user_id: s.string(),
-    status: s.enum_(['pending', 'processing', 'shipped', 'delivered']),
-    total: s.number(),
-    created_at: s.number(),
+    id: c.uuid(),
+    user_id: c.uuid(),
+    status: c.enum(['pending', 'processing', 'shipped', 'delivered']),
+    total: c.decimal(10, 2),
+    created_at: c.integer(),
   },
 })
 
@@ -228,36 +227,41 @@ Return behavior:
 
 ### Data Validation
 
-For write operations, data validation happens before SQL is executed so invalid data does not get written to the database.
-
-`data-table` treats each column schema as both:
-
-- a runtime validator (is this input valid?)
-- a parser (what normalized value should be written?)
-
-If you're familiar with Zod, this is the same idea: schema-first validation where values are checked and parsed before use. In `data-table`, that parsing runs automatically on writes (`create`, `createMany`, `update`, `upsert`) so only schema-valid values are sent to the database. Invalid values and unknown columns fail fast before a write is attempted.
-
-Tables are also [Standard Schema](https://standardschema.dev/)-compatible, so you can run the same validation explicitly with `remix/data-schema` before writing:
+Validation is optional and table-scoped. Define `validate(context)` on a table to validate and/or
+coerce incoming write payloads.
 
 ```ts
-import { parseSafe } from 'remix/data-schema'
+import { column as c, table } from 'remix/data-table'
 
-let result = parseSafe(users, {
-  id: 'u_004',
-  email: 'new@example.com',
-  role: 'customer',
+let payments = table({
+  name: 'payments',
+  columns: {
+    id: c.uuid(),
+    amount: c.decimal(10, 2),
+  },
+  validate({ operation, value }) {
+    if (operation === 'create' && typeof value.amount === 'string') {
+      let amount = Number(value.amount)
+
+      if (!Number.isFinite(amount)) {
+        return { issues: [{ message: 'Expected a numeric amount', path: ['amount'] }] }
+      }
+
+      return { value: { ...value, amount } }
+    }
+
+    return { value }
+  },
 })
-
-if (!result.success) {
-  // Handle validation issues
-}
 ```
 
-Validation semantics match `create()`/`update()` input behavior:
+Validation semantics:
 
-- Partial objects are allowed
-- Unknown columns fail validation
-- Provided column values are parsed through each column schema
+- `validate` runs for writes (`create`, `createMany`, `insert`, `insertMany`, `update`, `updateMany`, `upsert`)
+- Hook context includes `{ operation: 'create' | 'update', tableName, value }`
+- Payloads are partial objects
+- Unknown columns fail validation before and after hook processing
+- Predicate values (`where`, `having`, join predicates) are not runtime-validated
 
 ## Transactions
 
@@ -305,16 +309,22 @@ app/
 ### Migration File Example
 
 ```ts
-import { createMigration, column as c } from 'remix/data-table/migrations'
+import { column as c, table } from 'remix/data-table'
+import { createMigration } from 'remix/data-table/migrations'
+
+let users = table({
+  name: 'users',
+  columns: {
+    id: c.integer().primaryKey(),
+    email: c.varchar(255).notNull().unique('users_email_uq'),
+    created_at: c.timestamp({ withTimezone: true }).defaultNow(),
+  },
+})
 
 export default createMigration({
   async up({ db }) {
-    await db.createTable('users', (table) => {
-      table.addColumn('id', c.integer().primaryKey())
-      table.addColumn('email', c.varchar(255).notNull().unique())
-      table.addColumn('created_at', c.timestamp({ withTimezone: true }).defaultNow())
-      table.addIndex('users_email_idx', 'email', { unique: true })
-    })
+    await db.createTable(users)
+    await db.createIndex('users', 'users_email_idx', 'email', { unique: true })
   },
   async down({ db }) {
     await db.dropTable('users', { ifExists: true })
@@ -425,7 +435,7 @@ let result = await db.exec(sql`
 
 ## Related Packages
 
-- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Schema parsing and validation used by `data-table`
+- [`data-schema`](https://github.com/remix-run/remix/tree/main/packages/data-schema) - Optional schema parsing you can use inside table-level `validate(...)` hooks
 - [`data-table-postgres`](https://github.com/remix-run/remix/tree/main/packages/data-table-postgres) - PostgreSQL adapter
 - [`data-table-mysql`](https://github.com/remix-run/remix/tree/main/packages/data-table-mysql) - MySQL adapter
 - [`data-table-sqlite`](https://github.com/remix-run/remix/tree/main/packages/data-table-sqlite) - SQLite adapter

@@ -1,14 +1,15 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { number, parseSafe, string } from '@remix-run/data-schema'
 
+import { column } from './column.ts'
 import {
   columnMetadataKey,
-  table,
+  getTableValidator,
   getTableName,
   getTablePrimaryKey,
   getTableReference,
   hasMany,
+  table,
   tableMetadataKey,
 } from './table.ts'
 
@@ -17,8 +18,8 @@ describe('table metadata', () => {
     let users = table({
       name: 'users',
       columns: {
-        id: number(),
-        email: string(),
+        id: column.integer(),
+        email: column.text(),
       },
     })
 
@@ -34,50 +35,63 @@ describe('table metadata', () => {
     assert.equal(users[tableMetadataKey].name, 'users')
   })
 
-  it('is standard-schema compatible with create-style validation semantics', () => {
+  it('supports an optional table-level validator hook', () => {
+    let calls: Array<'create' | 'update'> = []
     let users = table({
       name: 'users',
       columns: {
-        id: number(),
-        email: string(),
+        id: column.integer(),
+        email: column.text(),
+      },
+      validate({ operation, value }) {
+        calls.push(operation)
+
+        if (operation === 'create') {
+          return {
+            value: {
+              ...value,
+              id: typeof value.id === 'string' ? Number(value.id) : value.id,
+            },
+          }
+        }
+
+        return {
+          value,
+        }
       },
     })
 
-    let partialResult = parseSafe(users, { id: 1 })
-    assert.equal(partialResult.success, true)
-
-    if (partialResult.success) {
-      assert.deepEqual(partialResult.value, { id: 1 })
+    let validator = getTableValidator(users)
+    assert.ok(validator)
+    if (!validator) {
+      throw new Error('Expected validator')
     }
 
-    let unknownKeyResult = parseSafe(users, { id: 1, extra: 'x' })
-    assert.equal(unknownKeyResult.success, false)
+    let createResult = validator({
+      operation: 'create',
+      tableName: 'users',
+      value: { id: '1' as never },
+    })
+    assert.deepEqual(createResult, { value: { id: 1 } })
 
-    if (!unknownKeyResult.success) {
-      assert.deepEqual(unknownKeyResult.issues[0].path, ['extra'])
-      assert.match(unknownKeyResult.issues[0].message, /Unknown column "extra"/)
-    }
+    let updateResult = validator({ operation: 'update', tableName: 'users', value: { id: 2 } })
+    assert.deepEqual(updateResult, { value: { id: 2 } })
 
-    let invalidValueResult = parseSafe(users, { id: 'not-a-number' })
-    assert.equal(invalidValueResult.success, false)
-
-    if (!invalidValueResult.success) {
-      assert.deepEqual(invalidValueResult.issues[0].path, ['id'])
-    }
+    assert.deepEqual(calls, ['create', 'update'])
   })
 
   it('builds relations with functional helpers', () => {
     let users = table({
       name: 'users',
       columns: {
-        id: number(),
+        id: column.integer(),
       },
     })
     let orders = table({
       name: 'orders',
       columns: {
-        id: number(),
-        user_id: number(),
+        id: column.integer(),
+        user_id: column.integer(),
       },
     })
 

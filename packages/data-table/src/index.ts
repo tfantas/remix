@@ -78,7 +78,6 @@ export type {
   BelongsToOptions,
   ColumnReference,
   ColumnReferenceForQualifiedName,
-  ColumnSchemas,
   HasManyOptions,
   HasManyThroughOptions,
   HasOneOptions,
@@ -99,25 +98,34 @@ export type {
   TableReference,
   TableRow,
   TableRowWith,
+  TableColumnsDefinition,
+  TableValidate,
+  TableValidationContext,
+  TableValidationOperation,
+  TableValidationResult,
   TimestampConfig,
   TimestampOptions,
+  ValidationIssue,
 } from './lib/table.ts'
 export {
   belongsTo,
   columnMetadataKey,
   getTableColumns,
+  getTableColumnDefinitions,
   getTableName,
   getTablePrimaryKey,
   getTableReference,
   getTableTimestamps,
+  getTableValidator,
   hasMany,
   hasManyThrough,
   hasOne,
   table,
   tableMetadataKey,
-  timestampSchema,
   timestamps,
 } from './lib/table.ts'
+export type { ColumnNamespace } from './lib/column.ts'
+export { ColumnBuilder, column } from './lib/column.ts'
 
 export type { Predicate, WhereInput, WhereObject } from './lib/operators.ts'
 export {

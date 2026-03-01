@@ -58,15 +58,12 @@
     }
   },
   "devDependencies": {
-    "@remix-run/data-schema": "workspace:*",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "better-sqlite3": "^12.4.1"
   },
-  "dependencies": {
-    "@remix-run/data-schema": "workspace:^"
-  },
+  "dependencies": {},
   "scripts": {
     "build": "tsgo -p tsconfig.build.json",
     "clean": "git clean -fdX",

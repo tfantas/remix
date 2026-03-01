@@ -3,6 +3,7 @@ import type {
   AlterTableChange,
   CheckConstraint,
   ColumnDefinition,
+  CreateTableOperation,
   DataMigrationOperation,
   ForeignKeyAction,
   ForeignKeyConstraint,
@@ -12,9 +13,15 @@ import type {
   UniqueConstraint,
 } from '../adapter.ts'
 import { rawSql } from '../sql.ts'
-import type { AlterTableBuilder, CreateTableBuilder, MigrationOperations } from '../migrations.ts'
+import {
+  getTableColumnDefinitions,
+  getTableName,
+  getTablePrimaryKey,
+} from '../table.ts'
+import type { AnyTable } from '../table.ts'
+import type { AlterTableBuilder, MigrationOperations } from '../migrations.ts'
 
-import { ColumnBuilder } from './column-builder.ts'
+import { ColumnBuilder } from '../column.ts'
 import { normalizeIndexColumns, toTableRef } from './helpers.ts'
 
 function asColumnDefinition(definition: ColumnDefinition | ColumnBuilder): ColumnDefinition {
@@ -25,64 +32,98 @@ function asColumnDefinition(definition: ColumnDefinition | ColumnBuilder): Colum
   return definition
 }
 
-class CreateTableBuilderRuntime implements CreateTableBuilder {
-  columns: Record<string, ColumnDefinition> = {}
-  primaryKey: PrimaryKeyConstraint | undefined
-  uniques: UniqueConstraint[] = []
-  checks: CheckConstraint[] = []
-  foreignKeys: ForeignKeyConstraint[] = []
-  indexes: Omit<IndexDefinition, 'table'>[] = []
-  tableComment: string | undefined
+function normalizeTableIdentifier(value: string): string {
+  let normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
 
-  addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void {
-    this.columns[name] = asColumnDefinition(definition)
+  if (normalized.length === 0) {
+    return 'table'
   }
 
-  addPrimaryKey(name: string, columns: string[]): void {
-    this.primaryKey = { columns: [...columns], name }
+  return normalized
+}
+
+function createPrimaryKeyConstraintName(table: TableRef): string {
+  let qualifiedName = table.schema ? table.schema + '_' + table.name : table.name
+  return normalizeTableIdentifier(qualifiedName) + '_pk'
+}
+
+function lowerTableForCreate(table: AnyTable): CreateTableOperation {
+  let tableRef = toTableRef(getTableName(table))
+  let sourceColumnDefinitions = getTableColumnDefinitions(table)
+  let columns: Record<string, ColumnDefinition> = {}
+  let uniques: UniqueConstraint[] = []
+  let checks: CheckConstraint[] = []
+  let foreignKeys: ForeignKeyConstraint[] = []
+
+  for (let columnName in sourceColumnDefinitions) {
+    if (!Object.prototype.hasOwnProperty.call(sourceColumnDefinitions, columnName)) {
+      continue
+    }
+
+    let sourceDefinition = sourceColumnDefinitions[columnName]
+    let columnDefinition: ColumnDefinition = {
+      ...sourceDefinition,
+      checks: undefined,
+      references: undefined,
+      primaryKey: undefined,
+    }
+
+    let unique = sourceDefinition.unique
+
+    if (unique && typeof unique === 'object' && unique.name) {
+      uniques.push({
+        name: unique.name,
+        columns: [columnName],
+      })
+      columnDefinition.unique = undefined
+    }
+
+    if (sourceDefinition.checks) {
+      for (let check of sourceDefinition.checks) {
+        checks.push({
+          name: check.name,
+          expression: check.expression,
+        })
+      }
+    }
+
+    if (sourceDefinition.references) {
+      foreignKeys.push({
+        name: sourceDefinition.references.name,
+        columns: [columnName],
+        references: {
+          table: { ...sourceDefinition.references.table },
+          columns: [...sourceDefinition.references.columns],
+        },
+        onDelete: sourceDefinition.references.onDelete,
+        onUpdate: sourceDefinition.references.onUpdate,
+      })
+    }
+
+    columns[columnName] = columnDefinition
   }
 
-  addUnique(name: string, columns: string[]): void {
-    this.uniques.push({ columns: [...columns], name })
+  let primaryKeyColumns = [...getTablePrimaryKey(table)]
+  let primaryKey: PrimaryKeyConstraint | undefined
+
+  if (primaryKeyColumns.length > 0) {
+    primaryKey = {
+      columns: primaryKeyColumns,
+      name: createPrimaryKeyConstraintName(tableRef),
+    }
   }
 
-  addForeignKey(
-    name: string,
-    columns: string[],
-    refTable: string,
-    refColumns?: string[],
-    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
-  ): void {
-    this.foreignKeys.push({
-      columns: [...columns],
-      references: {
-        table: toTableRef(refTable),
-        columns: refColumns ? [...refColumns] : ['id'],
-      },
-      name,
-      onDelete: options?.onDelete,
-      onUpdate: options?.onUpdate,
-    })
-  }
-
-  addCheck(name: string, expression: string): void {
-    this.checks.push({ expression, name })
-  }
-
-  addIndex(
-    name: string,
-    columns: string | string[],
-    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
-  ): void {
-    this.indexes.push({
-      name,
-      columns: normalizeIndexColumns(columns),
-      ...options,
-    })
-  }
-
-  comment(text: string): void {
-    this.tableComment = text
+  return {
+    kind: 'createTable',
+    table: tableRef,
+    columns,
+    primaryKey,
+    uniques: uniques.length > 0 ? uniques : undefined,
+    checks: checks.length > 0 ? checks : undefined,
+    foreignKeys: foreignKeys.length > 0 ? foreignKeys : undefined,
   }
 }
 
@@ -208,31 +249,10 @@ export function createSchemaApi(
   emit: (operation: DataMigrationOperation) => Promise<void>,
 ): MigrationOperations {
   return {
-    async createTable(name, migrate, options) {
-      let builder = new CreateTableBuilderRuntime()
-      migrate(builder)
-
-      await emit({
-        kind: 'createTable',
-        table: toTableRef(name),
-        ifNotExists: options?.ifNotExists,
-        columns: builder.columns,
-        primaryKey: builder.primaryKey,
-        uniques: builder.uniques,
-        checks: builder.checks,
-        foreignKeys: builder.foreignKeys,
-        comment: builder.tableComment,
-      })
-
-      for (let index of builder.indexes) {
-        await emit({
-          kind: 'createIndex',
-          index: {
-            table: toTableRef(name),
-            ...index,
-          },
-        })
-      }
+    async createTable(table, options) {
+      let operation = lowerTableForCreate(table)
+      operation.ifNotExists = options?.ifNotExists
+      await emit(operation)
     },
     async alterTable(name, migrate, options) {
       let table = toTableRef(name)

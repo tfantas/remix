@@ -1,9 +1,7 @@
-import { parseSafe } from '@remix-run/data-schema'
-import type { Schema } from '@remix-run/data-schema'
-
 import type {
   DataManipulationResult,
   CountOperation,
+  ColumnDefinition,
   DatabaseAdapter,
   DeleteOperation,
   ExistsOperation,
@@ -32,7 +30,10 @@ import type {
   TablePrimaryKey,
   TableRow,
   TableRowWith,
+  TableValidate,
+  TableValidationOperation,
   TimestampConfig,
+  ValidationIssue,
   tableMetadataKey,
 } from './table.ts'
 import {
@@ -42,7 +43,7 @@ import {
   getTableName,
   getTablePrimaryKey,
   getTableTimestamps,
-  validatePartialRow,
+  getTableValidator,
 } from './table.ts'
 import type { Predicate, WhereInput } from './operators.ts'
 import { and, eq, inList, normalizeWhereInput, or } from './operators.ts'
@@ -52,6 +53,7 @@ import type { DataManipulationOperation } from './adapter.ts'
 import type { Pretty } from './types.ts'
 import { normalizeColumnInput } from './references.ts'
 import type { ColumnInput, NormalizeColumnInput, TableMetadataLike } from './references.ts'
+import type { ColumnBuilder } from './column.ts'
 
 type QueryState = {
   select: '*' | SelectColumn[]
@@ -156,12 +158,21 @@ export type QueryTableInput<
 > = TableMetadataLike<
   tableName,
   {
-    [column in keyof row & string]: Schema<any, row[column]>
+    [column in keyof row & string]: ColumnBuilder<row[column]>
   },
   primaryKey,
   TimestampConfig | null
 > & {
-  '~standard': Schema<unknown, Partial<row>>['~standard']
+  [tableMetadataKey]: {
+    name: tableName
+    columns: {
+      [column in keyof row & string]: ColumnBuilder<row[column]>
+    }
+    primaryKey: primaryKey
+    timestamps: TimestampConfig | null
+    columnDefinitions: Record<string, ColumnDefinition>
+    validate?: TableValidate<Record<string, unknown>>
+  }
 } & Record<string, unknown>
 
 export type QueryBuilderFor<
@@ -801,14 +812,13 @@ class DatabaseRuntime implements Database {
  * @returns A `Database` API instance.
  * @example
  * ```ts
- * import { createDatabase, table } from 'remix/data-table'
- * import { number, string } from 'remix/data-schema'
+ * import { column as c, createDatabase, table } from 'remix/data-table'
  *
  * let users = table({
  *   name: 'users',
  *   columns: {
- *     id: number(),
- *     email: string(),
+ *     id: c.integer(),
+ *     email: c.varchar(255),
  *   },
  * })
  *
@@ -1516,6 +1526,7 @@ export class QueryBuilder<
           options.update,
           this.#database.now(),
           options?.touch ?? true,
+          'create',
         )
       : undefined
     let returning = options?.returning
@@ -2067,7 +2078,7 @@ function prepareInsertValues<table extends AnyTable>(
   now: unknown,
   touch: boolean,
 ): Record<string, unknown> {
-  let output = validateWriteValues(table, values)
+  let output = validateWriteValues(table, values, 'create')
   let timestamps = getTableTimestamps(table)
   let columns = getTableColumns(table)
 
@@ -2098,8 +2109,9 @@ function prepareUpdateValues<table extends AnyTable>(
   values: Partial<TableRow<table>>,
   now: unknown,
   touch: boolean,
+  operation: TableValidationOperation = 'update',
 ): Record<string, unknown> {
-  let output = validateWriteValues(table, values)
+  let output = validateWriteValues(table, values, operation)
   let timestamps = getTableTimestamps(table)
   let columns = getTableColumns(table)
 
@@ -2120,55 +2132,133 @@ function prepareUpdateValues<table extends AnyTable>(
 function validateWriteValues<table extends AnyTable>(
   table: table,
   values: Partial<TableRow<table>>,
+  operation: TableValidationOperation,
 ): Record<string, unknown> {
-  let columns = getTableColumns(table)
   let tableName = getTableName(table)
-  let result = validatePartialRow(table, values)
+  let normalizedInput = normalizeWriteObject(table, values, operation)
+  let validator = getTableValidator(table)
 
-  if ('issues' in result) {
-    let firstIssue = result.issues[0]
-    let issuePath = firstIssue?.path
-    let firstPathSegment = issuePath && issuePath.length > 0 ? issuePath[0] : undefined
-    let column = typeof firstPathSegment === 'string' ? firstPathSegment : undefined
+  if (!validator) {
+    return normalizedInput
+  }
 
-    if (column && !Object.prototype.hasOwnProperty.call(columns, column)) {
-      throw new DataTableValidationError(
-        'Unknown column "' + column + '" for table "' + tableName + '"',
-        [],
-      )
-    }
+  let validationResult = validator({
+    operation,
+    tableName,
+    value: normalizedInput as Partial<TableRow<table>>,
+  })
 
-    if (column) {
-      throw new DataTableValidationError(
-        'Invalid value for column "' + column + '" in table "' + tableName + '"',
-        result.issues,
-        {
-          metadata: {
-            table: tableName,
-            column,
-          },
-        },
-      )
-    }
+  if (hasIssues(validationResult)) {
+    throwValidationIssues(tableName, validationResult.issues, operation)
+  }
 
+  if (!hasValue(validationResult)) {
     throw new DataTableValidationError(
-      'Invalid value for table "' + tableName + '"',
-      result.issues,
+      'Invalid validator result for table "' + tableName + '"',
+      [{ message: 'Expected validator to return { value } or { issues }' }],
       {
         metadata: {
           table: tableName,
+          operation,
         },
       },
     )
   }
 
-  return result.value as Record<string, unknown>
+  return normalizeWriteObject(table, validationResult.value, operation)
+}
+
+function hasIssues(value: unknown): value is { issues: ReadonlyArray<ValidationIssue> } {
+  return typeof value === 'object' && value !== null && 'issues' in value
+}
+
+function hasValue(value: unknown): value is { value: unknown } {
+  return typeof value === 'object' && value !== null && 'value' in value
+}
+
+function normalizeWriteObject<table extends AnyTable>(
+  table: table,
+  value: unknown,
+  operation: TableValidationOperation,
+): Record<string, unknown> {
+  let tableName = getTableName(table)
+  let columns = getTableColumns(table)
+
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new DataTableValidationError(
+      'Invalid value for table "' + tableName + '"',
+      [{ message: 'Expected object' }],
+      {
+        metadata: {
+          table: tableName,
+          operation,
+        },
+      },
+    )
+  }
+
+  let output: Record<string, unknown> = {}
+
+  for (let key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+      continue
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(columns, key)) {
+      throw new DataTableValidationError(
+        'Unknown column "' + key + '" for table "' + tableName + '"',
+        [],
+        {
+          metadata: {
+            table: tableName,
+            column: key,
+            operation,
+          },
+        },
+      )
+    }
+
+    output[key] = (value as Record<string, unknown>)[key]
+  }
+
+  return output
+}
+
+function throwValidationIssues(
+  tableName: string,
+  issues: ReadonlyArray<ValidationIssue>,
+  operation: TableValidationOperation,
+): never {
+  let firstIssue = issues[0]
+  let issuePath = firstIssue?.path
+  let firstPathSegment = issuePath && issuePath.length > 0 ? issuePath[0] : undefined
+  let column = typeof firstPathSegment === 'string' ? firstPathSegment : undefined
+
+  if (column) {
+    throw new DataTableValidationError(
+      'Invalid value for column "' + column + '" in table "' + tableName + '"',
+      issues,
+      {
+        metadata: {
+          table: tableName,
+          column,
+          operation,
+        },
+      },
+    )
+  }
+
+  throw new DataTableValidationError('Invalid value for table "' + tableName + '"', issues, {
+    metadata: {
+      table: tableName,
+      operation,
+    },
+  })
 }
 
 type ResolvedPredicateColumn = {
   tableName: string
   columnName: string
-  schema: unknown
 }
 
 function createPredicateColumnResolver(
@@ -2190,7 +2280,6 @@ function createPredicateColumnResolver(
       let resolvedColumn: ResolvedPredicateColumn = {
         tableName,
         columnName,
-        schema: tableColumns[columnName],
       }
 
       qualifiedColumns.set(tableName + '.' + columnName, resolvedColumn)
@@ -2248,13 +2337,6 @@ function normalizePredicateValues(
       return predicate
     }
 
-    if (
-      (predicate.operator === 'eq' || predicate.operator === 'ne') &&
-      (predicate.value === null || predicate.value === undefined)
-    ) {
-      return predicate
-    }
-
     if (predicate.operator === 'in' || predicate.operator === 'notIn') {
       if (!Array.isArray(predicate.value)) {
         throw new DataTableValidationError(
@@ -2273,28 +2355,15 @@ function normalizePredicateValues(
         )
       }
 
-      let parsedValues = predicate.value.map((value) => parsePredicateValue(column, value))
-
-      return {
-        ...predicate,
-        value: parsedValues,
-      }
+      return predicate
     }
 
-    return {
-      ...predicate,
-      value: parsePredicateValue(column, predicate.value),
-    }
+    return predicate
   }
 
   if (predicate.type === 'between') {
-    let column = resolveColumn(predicate.column)
-
-    return {
-      ...predicate,
-      lower: parsePredicateValue(column, predicate.lower),
-      upper: parsePredicateValue(column, predicate.upper),
-    }
+    resolveColumn(predicate.column)
+    return predicate
   }
 
   if (predicate.type === 'null') {
@@ -2306,31 +2375,6 @@ function normalizePredicateValues(
     ...predicate,
     predicates: predicate.predicates.map((child) => normalizePredicateValues(child, resolveColumn)),
   }
-}
-
-function parsePredicateValue(column: ResolvedPredicateColumn, value: unknown): unknown {
-  let result = parseSafe(column.schema as any, value) as
-    | { success: true; value: unknown }
-    | { success: false; issues: ReadonlyArray<unknown> }
-
-  if (!result.success) {
-    throw new DataTableValidationError(
-      'Invalid filter value for column "' +
-        column.columnName +
-        '" in table "' +
-        column.tableName +
-        '"',
-      result.issues,
-      {
-        metadata: {
-          table: column.tableName,
-          column: column.columnName,
-        },
-      },
-    )
-  }
-
-  return result.value
 }
 
 function uniqueTuples(rows: Record<string, unknown>[], columns: string[]): unknown[][] {

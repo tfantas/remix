@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { number } from '@remix-run/data-schema'
 
+import { column } from './column.ts'
 import {
   and,
   between,
@@ -27,24 +27,24 @@ import { table } from './table.ts'
 let accounts = table({
   name: 'accounts',
   columns: {
-    id: number(),
+    id: column.integer(),
   },
 })
 
 let projects = table({
   name: 'projects',
   columns: {
-    id: number(),
-    account_id: number(),
+    id: column.integer(),
+    account_id: column.integer(),
   },
 })
 
 let invoices = table({
   name: 'billing.invoices',
   columns: {
-    id: number(),
-    account_id: number(),
-    total: number(),
+    id: column.integer(),
+    account_id: column.integer(),
+    total: column.integer(),
   },
 })
 

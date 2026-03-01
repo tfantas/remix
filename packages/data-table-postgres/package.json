@@ -33,7 +33,6 @@
     }
   },
   "devDependencies": {
-    "@remix-run/data-schema": "workspace:*",
     "@remix-run/data-table": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "^8.15.6",

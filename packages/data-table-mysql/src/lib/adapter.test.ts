@@ -1,42 +1,41 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { number, string } from '@remix-run/data-schema'
 import type { DataMigrationOperation } from '@remix-run/data-table'
-import { createDatabase, table, eq, ilike, inList } from '@remix-run/data-table'
+import { column, createDatabase, table, eq, ilike, inList } from '@remix-run/data-table'
 
 import { createMysqlDatabaseAdapter } from './adapter.ts'
 
 let accounts = table({
   name: 'accounts',
   columns: {
-    id: number(),
-    email: string(),
+    id: column.integer(),
+    email: column.text(),
   },
 })
 
 let projects = table({
   name: 'projects',
   columns: {
-    id: number(),
-    account_id: number(),
-    name: string(),
+    id: column.integer(),
+    account_id: column.integer(),
+    name: column.text(),
   },
 })
 
 let invoices = table({
   name: 'billing.invoices',
   columns: {
-    id: number(),
-    account_id: number(),
+    id: column.integer(),
+    account_id: column.integer(),
   },
 })
 
 let accountProjects = table({
   name: 'account_projects',
   columns: {
-    account_id: number(),
-    project_id: number(),
-    email: string(),
+    account_id: column.integer(),
+    project_id: column.integer(),
+    email: column.text(),
   },
   primaryKey: ['account_id', 'project_id'],
 })

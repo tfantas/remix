@@ -1,47 +1,45 @@
-import * as s from 'remix/data-schema'
-import * as coerce from 'remix/data-schema/coerce'
-import { belongsTo, table, hasMany } from 'remix/data-table'
+import { belongsTo, column as c, table, hasMany } from 'remix/data-table'
 import type { TableRow, TableRowWith } from 'remix/data-table'
 
 export const books = table({
   name: 'books',
   columns: {
-    id: coerce.number(),
-    slug: s.string(),
-    title: s.string(),
-    author: s.string(),
-    description: s.string(),
-    price: s.number(),
-    genre: s.string(),
-    image_urls: s.string(),
-    cover_url: s.string(),
-    isbn: s.string(),
-    published_year: s.number(),
-    in_stock: s.boolean(),
+    id: c.integer(),
+    slug: c.text(),
+    title: c.text(),
+    author: c.text(),
+    description: c.text(),
+    price: c.decimal(10, 2),
+    genre: c.text(),
+    image_urls: c.text(),
+    cover_url: c.text(),
+    isbn: c.text(),
+    published_year: c.integer(),
+    in_stock: c.boolean(),
   },
 })
 
 export const users = table({
   name: 'users',
   columns: {
-    id: coerce.number(),
-    email: s.string(),
-    password: s.string(),
-    name: s.string(),
-    role: s.enum_(['customer', 'admin']),
-    created_at: s.number(),
+    id: c.integer(),
+    email: c.text(),
+    password: c.text(),
+    name: c.text(),
+    role: c.enum(['customer', 'admin']),
+    created_at: c.integer(),
   },
 })
 
 export const orders = table({
   name: 'orders',
   columns: {
-    id: coerce.number(),
-    user_id: coerce.number(),
-    total: s.number(),
-    status: s.enum_(['pending', 'processing', 'shipped', 'delivered']),
-    shipping_address_json: s.string(),
-    created_at: s.number(),
+    id: c.integer(),
+    user_id: c.integer(),
+    total: c.decimal(10, 2),
+    status: c.enum(['pending', 'processing', 'shipped', 'delivered']),
+    shipping_address_json: c.text(),
+    created_at: c.integer(),
   },
 })
 
@@ -49,11 +47,11 @@ export const orderItems = table({
   name: 'order_items',
   primaryKey: ['order_id', 'book_id'],
   columns: {
-    order_id: coerce.number(),
-    book_id: coerce.number(),
-    title: s.string(),
-    unit_price: s.number(),
-    quantity: s.number(),
+    order_id: c.integer(),
+    book_id: c.integer(),
+    title: c.text(),
+    unit_price: c.decimal(10, 2),
+    quantity: c.integer(),
   },
 })
 
@@ -67,9 +65,9 @@ export const passwordResetTokens = table({
   name: 'password_reset_tokens',
   primaryKey: ['token'],
   columns: {
-    token: s.string(),
-    user_id: coerce.number(),
-    expires_at: s.number(),
+    token: c.text(),
+    user_id: c.integer(),
+    expires_at: c.integer(),
   },
 })
 

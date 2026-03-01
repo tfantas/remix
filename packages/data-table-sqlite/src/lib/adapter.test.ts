@@ -1,36 +1,35 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { number, string } from '@remix-run/data-schema'
 import Database from 'better-sqlite3'
 import type { DataMigrationOperation } from '@remix-run/data-table'
-import { createDatabase, table, eq } from '@remix-run/data-table'
+import { column, createDatabase, table, eq } from '@remix-run/data-table'
 
 import { createSqliteDatabaseAdapter } from './adapter.ts'
 
 let accounts = table({
   name: 'accounts',
   columns: {
-    id: number(),
-    email: string(),
-    status: string(),
+    id: column.integer(),
+    email: column.text(),
+    status: column.text(),
   },
 })
 
 let projects = table({
   name: 'projects',
   columns: {
-    id: number(),
-    account_id: number(),
-    name: string(),
+    id: column.integer(),
+    account_id: column.integer(),
+    name: column.text(),
   },
 })
 
 let accountProjects = table({
   name: 'account_projects',
   columns: {
-    account_id: number(),
-    project_id: number(),
-    email: string(),
+    account_id: column.integer(),
+    project_id: column.integer(),
+    email: column.text(),
   },
   primaryKey: ['account_id', 'project_id'],
 })

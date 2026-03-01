@@ -10,12 +10,13 @@ import type {
   DatabaseAdapter,
   TransactionToken,
 } from './adapter.ts'
-import { column } from './migrations/column-builder.ts'
+import { column } from './column.ts'
 import { parseMigrationFilename } from './migrations/filename.ts'
 import { createMigrationRegistry } from './migrations/registry.ts'
 import { createMigrationRunner } from './migrations/runner.ts'
 import { createMigration } from './migrations.ts'
 import type { SqlStatement } from './sql.ts'
+import { table } from './table.ts'
 
 type JournalRow = {
   id: string
@@ -176,6 +177,15 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   }
 }
 
+function createIdTable(name: string) {
+  return table({
+    name,
+    columns: {
+      id: column.integer().primaryKey(),
+    },
+  })
+}
+
 describe('migration column builder', () => {
   it('builds canonical column specs with chainable methods', () => {
     let columnSpec = column
@@ -309,12 +319,15 @@ describe('migration runner', () => {
     let adapter = new MemoryMigrationAdapter()
     let migration = createMigration({
       async up({ db }) {
-        await db.createTable('app.users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-          table.addColumn('email', column.text().notNull())
-          table.addIndex('users_email_idx', 'email', { unique: true })
-          table.comment('Users table')
+        let usersTable = table({
+          name: 'app.users',
+          columns: {
+            id: column.integer().primaryKey(),
+            email: column.text().notNull(),
+          },
         })
+        await db.createTable(usersTable)
+        await db.createIndex('app.users', 'users_email_idx', 'email', { unique: true })
 
         await db.alterTable('app.users', (table) => {
           table.addColumn('status', column.text().default('active'))
@@ -340,6 +353,10 @@ describe('migration runner', () => {
     let createTableOperation = adapter.migratedOperations[0]
     assert.equal(createTableOperation.kind, 'createTable')
     assert.deepEqual(createTableOperation.table, { schema: 'app', name: 'users' })
+    assert.deepEqual(createTableOperation.primaryKey, {
+      name: 'app_users_pk',
+      columns: ['id'],
+    })
 
     let createIndexOperation = adapter.migratedOperations[1]
     assert.equal(createIndexOperation.kind, 'createIndex')
@@ -362,9 +379,7 @@ describe('migration runner', () => {
         name: 'users',
         migration: createMigration({
           async up({ db }) {
-            await db.createTable('users', (table) => {
-              table.addColumn('id', column.integer().primaryKey())
-            })
+            await db.createTable(createIdTable('users'))
           },
           async down({ db }) {
             await db.dropTable('users')
@@ -376,9 +391,7 @@ describe('migration runner', () => {
         name: 'posts',
         migration: createMigration({
           async up({ db }) {
-            await db.createTable('posts', (table) => {
-              table.addColumn('id', column.integer().primaryKey())
-            })
+            await db.createTable(createIdTable('posts'))
           },
           async down({ db }) {
             await db.dropTable('posts')
@@ -415,9 +428,7 @@ describe('migration runner', () => {
     let adapter = new MemoryMigrationAdapter()
     let migration = createMigration({
       async up({ db }) {
-        await db.createTable('users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-        })
+        await db.createTable(createIdTable('users'))
       },
       async down() {},
     })
@@ -435,9 +446,7 @@ describe('migration runner', () => {
     let adapter = new MemoryMigrationAdapter()
     let appliedMigration = createMigration({
       async up({ db }) {
-        await db.createTable('users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-        })
+        await db.createTable(createIdTable('users'))
       },
       async down() {},
     })
@@ -471,9 +480,7 @@ describe('migration runner', () => {
 
     let migration = createMigration({
       async up({ db }) {
-        await db.createTable('users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-        })
+        await db.createTable(createIdTable('users'))
       },
       async down() {},
     })
@@ -492,9 +499,7 @@ describe('migration runner', () => {
     let migration = createMigration({
       transaction: 'required',
       async up({ db }) {
-        await db.createTable('users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-        })
+        await db.createTable(createIdTable('users'))
       },
       async down() {},
     })
@@ -508,9 +513,7 @@ describe('migration runner', () => {
     let adapter = new MemoryMigrationAdapter()
     let migration = createMigration({
       async up({ db }) {
-        await db.createTable('users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-        })
+        await db.createTable(createIdTable('users'))
       },
       async down() {},
     })
@@ -529,9 +532,7 @@ describe('migration runner', () => {
         name: 'users',
         migration: createMigration({
           async up({ db }) {
-            await db.createTable('users', (table) => {
-              table.addColumn('id', column.integer().primaryKey())
-            })
+            await db.createTable(createIdTable('users'))
           },
           async down() {},
         }),
@@ -541,9 +542,7 @@ describe('migration runner', () => {
         name: 'posts',
         migration: createMigration({
           async up({ db }) {
-            await db.createTable('posts', (table) => {
-              table.addColumn('id', column.integer().primaryKey())
-            })
+            await db.createTable(createIdTable('posts'))
           },
           async down() {},
         }),
@@ -573,23 +572,25 @@ describe('migration runner', () => {
     let adapter = new MemoryMigrationAdapter()
     let migration = createMigration({
       async up({ db }) {
-        await db.createTable('app.accounts', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-          table.addColumn('email', column.text().notNull())
-          table.addColumn('nickname', { type: 'text' })
-          table.addPrimaryKey('accounts_pk', ['id'])
-          table.addUnique('accounts_email_uq', ['email'])
-          table.addForeignKey('accounts_user_fk', ['id'], 'auth.users', ['id'], {
-            onDelete: 'cascade',
-            onUpdate: 'restrict',
-          })
-          table.addCheck('accounts_id_check', 'id > 0')
-          table.addIndex('accounts_email_idx', ['email', 'id'], {
-            unique: true,
-            where: 'id > 0',
-            using: 'btree',
-          })
-          table.comment('Accounts table')
+        let accountsTable = table({
+          name: 'app.accounts',
+          columns: {
+            id: column
+              .integer()
+              .primaryKey()
+              .references('auth.users', ['id'], 'accounts_user_fk')
+              .onDelete('cascade')
+              .onUpdate('restrict')
+              .check('id > 0', 'accounts_id_check'),
+            email: column.text().notNull().unique('accounts_email_uq'),
+            nickname: column.text(),
+          },
+        })
+        await db.createTable(accountsTable)
+        await db.createIndex('app.accounts', 'accounts_email_idx', ['email', 'id'], {
+          unique: true,
+          where: 'id > 0',
+          using: 'btree',
         })
 
         await db.alterTable('app.accounts', (table) => {
@@ -751,9 +752,7 @@ describe('migration runner', () => {
 
     let migration = createMigration({
       async up({ db }) {
-        await db.createTable('users', (table) => {
-          table.addColumn('id', column.integer().primaryKey())
-        })
+        await db.createTable(createIdTable('users'))
       },
       async down() {},
     })
@@ -888,9 +887,7 @@ describe('migration registry', () => {
       name: 'users',
       migration: createMigration({
         async up({ db }) {
-          await db.createTable('users', (table) => {
-            table.addColumn('id', column.integer().primaryKey())
-          })
+          await db.createTable(createIdTable('users'))
         },
         async down() {},
       }),

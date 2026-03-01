@@ -375,10 +375,6 @@ importers:
         version: 7.0.0-dev.20251125.1
 
   packages/data-table:
-    dependencies:
-      '@remix-run/data-schema':
-        specifier: workspace:^
-        version: link:../data-schema
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -399,9 +395,6 @@ importers:
         specifier: workspace:^
         version: link:../data-table
     devDependencies:
-      '@remix-run/data-schema':
-        specifier: workspace:*
-        version: link:../data-schema
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
@@ -418,9 +411,6 @@ importers:
         specifier: workspace:^
         version: link:../data-table
     devDependencies:
-      '@remix-run/data-schema':
-        specifier: workspace:*
-        version: link:../data-schema
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
@@ -440,9 +430,6 @@ importers:
         specifier: workspace:^
         version: link:../data-table
     devDependencies:
-      '@remix-run/data-schema':
-        specifier: workspace:*
-        version: link:../data-schema
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13

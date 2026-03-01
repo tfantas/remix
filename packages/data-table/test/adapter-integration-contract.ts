@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 import { beforeEach, it } from 'node:test'
-import { boolean, nullable, number, string } from '@remix-run/data-schema'
 
+import { column } from '../src/lib/column.ts'
 import type { Database } from '../src/lib/database.ts'
 import { table, hasMany, hasManyThrough } from '../src/lib/table.ts'
 import { between, eq, ilike, inList, ne } from '../src/lib/operators.ts'
@@ -9,30 +9,30 @@ import { between, eq, ilike, inList, ne } from '../src/lib/operators.ts'
 let accounts = table({
   name: 'accounts',
   columns: {
-    id: number(),
-    email: string(),
-    status: string(),
-    nickname: nullable(string()),
+    id: column.integer(),
+    email: column.text(),
+    status: column.text(),
+    nickname: column.text().nullable(),
   },
 })
 
 let projects = table({
   name: 'projects',
   columns: {
-    id: number(),
-    account_id: number(),
-    name: string(),
-    archived: boolean(),
+    id: column.integer(),
+    account_id: column.integer(),
+    name: column.text(),
+    archived: column.boolean(),
   },
 })
 
 let tasks = table({
   name: 'tasks',
   columns: {
-    id: number(),
-    project_id: number(),
-    title: string(),
-    state: string(),
+    id: column.integer(),
+    project_id: column.integer(),
+    title: column.text(),
+    state: column.text(),
   },
 })
 

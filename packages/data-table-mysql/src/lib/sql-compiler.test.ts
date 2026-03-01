@@ -1,9 +1,9 @@
 import * as assert from 'node:assert/strict'
 import { beforeEach, describe, it } from 'node:test'
-import { boolean, number, string } from '@remix-run/data-schema'
 import {
   and,
   between,
+  column,
   createDatabase,
   table,
   eq,
@@ -27,19 +27,19 @@ import { compileMysqlStatement } from './sql-compiler.ts'
 let accounts = table({
   name: 'accounts',
   columns: {
-    id: number(),
-    email: string(),
-    status: string(),
-    deleted: boolean(),
+    id: column.integer(),
+    email: column.text(),
+    status: column.text(),
+    deleted: column.boolean(),
   },
 })
 
 let tasks = table({
   name: 'tasks',
   columns: {
-    id: number(),
-    name: string(),
-    account_id: number(),
+    id: column.integer(),
+    name: column.text(),
+    account_id: column.integer(),
   },
 })
 

@@ -1,35 +1,27 @@
-import type {
-  ColumnDefinition,
-  ForeignKeyAction,
-  IdentityOptions,
-} from '../adapter.ts'
-import { toTableRef } from './helpers.ts'
+import type { ColumnDefinition, ForeignKeyAction, IdentityOptions } from './adapter.ts'
+import { toTableRef } from './migrations/helpers.ts'
 
 /**
- * Chainable builder used to describe database column definitions in migrations.
+ * Chainable builder used to describe physical column definitions.
  */
-export class ColumnBuilder {
+export class ColumnBuilder<output = unknown> {
   #definition: ColumnDefinition
 
-  /**
-   * Creates a column builder from an initial column definition.
-   * @param definition Initial canonical column definition.
-   */
   constructor(definition: ColumnDefinition) {
     this.#definition = definition
   }
 
-  nullable(): ColumnBuilder {
+  nullable(): ColumnBuilder<output | null> {
     this.#definition.nullable = true
-    return this
+    return this as unknown as ColumnBuilder<output | null>
   }
 
-  notNull(): ColumnBuilder {
+  notNull(): ColumnBuilder<Exclude<output, null>> {
     this.#definition.nullable = false
-    return this
+    return this as unknown as ColumnBuilder<Exclude<output, null>>
   }
 
-  default(value: unknown): ColumnBuilder {
+  default(value: unknown): ColumnBuilder<output> {
     this.#definition.default = {
       kind: 'literal',
       value,
@@ -37,14 +29,14 @@ export class ColumnBuilder {
     return this
   }
 
-  defaultNow(): ColumnBuilder {
+  defaultNow(): ColumnBuilder<output> {
     this.#definition.default = {
       kind: 'now',
     }
     return this
   }
 
-  defaultSql(expression: string): ColumnBuilder {
+  defaultSql(expression: string): ColumnBuilder<output> {
     this.#definition.default = {
       kind: 'sql',
       expression,
@@ -52,26 +44,23 @@ export class ColumnBuilder {
     return this
   }
 
-  primaryKey(): ColumnBuilder {
+  primaryKey(): ColumnBuilder<output> {
     this.#definition.primaryKey = true
     return this
   }
 
-  unique(name?: string): ColumnBuilder {
+  unique(name?: string): ColumnBuilder<output> {
     this.#definition.unique = name ? { name } : true
     return this
   }
 
-  /**
-   * Adds a named foreign-key reference for this column.
-   */
-  references(table: string, name: string): ColumnBuilder
-  references(table: string, columns: string | string[], name: string): ColumnBuilder
+  references(table: string, name: string): ColumnBuilder<output>
+  references(table: string, columns: string | string[], name: string): ColumnBuilder<output>
   references(
     table: string,
     columnsOrName: string | string[],
     maybeName?: string,
-  ): ColumnBuilder {
+  ): ColumnBuilder<output> {
     let columns = maybeName === undefined ? 'id' : columnsOrName
     let name = maybeName === undefined ? String(columnsOrName) : maybeName
 
@@ -85,7 +74,7 @@ export class ColumnBuilder {
     return this
   }
 
-  onDelete(action: ForeignKeyAction): ColumnBuilder {
+  onDelete(action: ForeignKeyAction): ColumnBuilder<output> {
     if (!this.#definition.references) {
       throw new Error('onDelete() requires references() to be set first')
     }
@@ -94,7 +83,7 @@ export class ColumnBuilder {
     return this
   }
 
-  onUpdate(action: ForeignKeyAction): ColumnBuilder {
+  onUpdate(action: ForeignKeyAction): ColumnBuilder<output> {
     if (!this.#definition.references) {
       throw new Error('onUpdate() requires references() to be set first')
     }
@@ -103,21 +92,19 @@ export class ColumnBuilder {
     return this
   }
 
-  check(expression: string, name: string): ColumnBuilder {
+  check(expression: string, name: string): ColumnBuilder<output> {
     let checks = this.#definition.checks ?? []
-
     checks.push({ expression, name })
     this.#definition.checks = checks
-
     return this
   }
 
-  comment(text: string): ColumnBuilder {
+  comment(text: string): ColumnBuilder<output> {
     this.#definition.comment = text
     return this
   }
 
-  computed(expression: string, options?: { stored?: boolean }): ColumnBuilder {
+  computed(expression: string, options?: { stored?: boolean }): ColumnBuilder<output> {
     this.#definition.computed = {
       expression,
       stored: options?.stored ?? true,
@@ -125,37 +112,37 @@ export class ColumnBuilder {
     return this
   }
 
-  unsigned(): ColumnBuilder {
+  unsigned(): ColumnBuilder<output> {
     this.#definition.unsigned = true
     return this
   }
 
-  autoIncrement(): ColumnBuilder {
+  autoIncrement(): ColumnBuilder<output> {
     this.#definition.autoIncrement = true
     return this
   }
 
-  identity(options?: IdentityOptions): ColumnBuilder {
+  identity(options?: IdentityOptions): ColumnBuilder<output> {
     this.#definition.identity = options ?? {}
     return this
   }
 
-  collate(name: string): ColumnBuilder {
+  collate(name: string): ColumnBuilder<output> {
     this.#definition.collate = name
     return this
   }
 
-  charset(name: string): ColumnBuilder {
+  charset(name: string): ColumnBuilder<output> {
     this.#definition.charset = name
     return this
   }
 
-  length(value: number): ColumnBuilder {
+  length(value: number): ColumnBuilder<output> {
     this.#definition.length = value
     return this
   }
 
-  precision(value: number, scale?: number): ColumnBuilder {
+  precision(value: number, scale?: number): ColumnBuilder<output> {
     this.#definition.precision = value
 
     if (scale !== undefined) {
@@ -165,12 +152,12 @@ export class ColumnBuilder {
     return this
   }
 
-  scale(value: number): ColumnBuilder {
+  scale(value: number): ColumnBuilder<output> {
     this.#definition.scale = value
     return this
   }
 
-  timezone(enabled = true): ColumnBuilder {
+  timezone(enabled = true): ColumnBuilder<output> {
     this.#definition.withTimezone = enabled
     return this
   }
@@ -183,34 +170,39 @@ export class ColumnBuilder {
   }
 }
 
+export type ColumnOutput<column extends ColumnBuilder<any>> =
+  column extends ColumnBuilder<infer output> ? output : never
+
+export type ColumnInput<column extends ColumnBuilder<any>> = ColumnOutput<column>
+
 /**
  * Public constructor namespace for column builders.
  */
 export type ColumnNamespace = {
-  varchar(length: number): ColumnBuilder
-  text(): ColumnBuilder
-  integer(): ColumnBuilder
+  varchar(length: number): ColumnBuilder<string>
+  text(): ColumnBuilder<string>
+  integer(): ColumnBuilder<number>
   bigint(): ColumnBuilder
-  decimal(precision: number, scale: number): ColumnBuilder
-  boolean(): ColumnBuilder
-  uuid(): ColumnBuilder
+  decimal(precision: number, scale: number): ColumnBuilder<number>
+  boolean(): ColumnBuilder<boolean>
+  uuid(): ColumnBuilder<string>
   date(): ColumnBuilder
   time(options?: { precision?: number; withTimezone?: boolean }): ColumnBuilder
   timestamp(options?: { precision?: number; withTimezone?: boolean }): ColumnBuilder
   json(): ColumnBuilder
   binary(length?: number): ColumnBuilder
-  enum(values: readonly string[]): ColumnBuilder
+  enum<values extends readonly string[]>(values: values): ColumnBuilder<values[number]>
 }
 
-function createColumnBuilder(type: ColumnDefinition['type']): ColumnBuilder {
+function createColumnBuilder<output = unknown>(type: ColumnDefinition['type']): ColumnBuilder<output> {
   return new ColumnBuilder({ type })
 }
 
 /**
- * Chainable column builder namespace used by migrations.
+ * Chainable column builder namespace.
  * @example
  * ```ts
- * import { column as c } from 'remix/data-table/migrations'
+ * import { column as c } from 'remix/data-table'
  *
  * let email = c.varchar(255).notNull().unique('users_email_uq')
  * ```
@@ -220,10 +212,10 @@ export let column: ColumnNamespace = {
     return new ColumnBuilder({ type: 'varchar', length })
   },
   text() {
-    return createColumnBuilder('text')
+    return createColumnBuilder<string>('text')
   },
   integer() {
-    return createColumnBuilder('integer')
+    return createColumnBuilder<number>('integer')
   },
   bigint() {
     return createColumnBuilder('bigint')
@@ -232,10 +224,10 @@ export let column: ColumnNamespace = {
     return new ColumnBuilder({ type: 'decimal', precision, scale })
   },
   boolean() {
-    return createColumnBuilder('boolean')
+    return createColumnBuilder<boolean>('boolean')
   },
   uuid() {
-    return createColumnBuilder('uuid')
+    return createColumnBuilder<string>('uuid')
   },
   date() {
     return createColumnBuilder('date')
@@ -260,7 +252,9 @@ export let column: ColumnNamespace = {
   binary(length?: number) {
     return new ColumnBuilder({ type: 'binary', length })
   },
-  enum(values: readonly string[]) {
-    return new ColumnBuilder({ type: 'enum', enumValues: [...values] })
+  enum<values extends readonly string[]>(values: values) {
+    return new ColumnBuilder({ type: 'enum', enumValues: [...values] }) as ColumnBuilder<
+      values[number]
+    >
   },
 }

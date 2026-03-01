@@ -1,8 +1,8 @@
 import * as assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
-import { boolean, number, string } from '@remix-run/data-schema'
 
 import type { DataManipulationOperation, DatabaseAdapter } from './adapter.ts'
+import { column } from './column.ts'
 import { createDatabase } from './database.ts'
 import { DataTableAdapterError, DataTableQueryError, DataTableValidationError } from './errors.ts'
 import { belongsTo, table, hasMany, hasManyThrough, hasOne, timestamps } from './table.ts'
@@ -14,40 +14,55 @@ import { createSqliteTestAdapter } from '../../test/sqlite-test-database.ts'
 let accounts = table({
   name: 'accounts',
   columns: {
-    id: number(),
-    email: string(),
-    status: string(),
+    id: column.integer(),
+    email: column.text(),
+    status: column.text(),
     ...timestamps(),
   },
   timestamps: true,
+  validate({ value }) {
+    if ('id' in value && typeof value.id !== 'number') {
+      return { issues: [{ message: 'Expected number', path: ['id'] }] }
+    }
+
+    if ('email' in value && typeof value.email !== 'string') {
+      return { issues: [{ message: 'Expected string', path: ['email'] }] }
+    }
+
+    if ('status' in value && typeof value.status !== 'string') {
+      return { issues: [{ message: 'Expected string', path: ['status'] }] }
+    }
+
+    return { value }
+  },
 })
 
 let projects = table({
   name: 'projects',
   columns: {
-    id: number(),
-    account_id: number(),
-    name: string(),
-    archived: boolean(),
+    id: column.integer(),
+    account_id: column.integer(),
+    name: column.text(),
+    archived: column.boolean(),
   },
 })
 
 let profiles = table({
   name: 'profiles',
   columns: {
-    id: number(),
-    account_id: number(),
-    display_name: string(),
+    id: column.integer(),
+    account_id: column.integer(),
+    display_name: column.text(),
   },
 })
 
 let tasks = table({
   name: 'tasks',
   columns: {
-    id: number(),
-    project_id: number(),
-    title: string(),
-    state: string(),
+    id: column.integer(),
+    project_id: column.integer(),
+    title: column.text(),
+    state: column.text(),
   },
 })
 
@@ -55,18 +70,18 @@ let memberships = table({
   name: 'memberships',
   primaryKey: ['organization_id', 'account_id'],
   columns: {
-    organization_id: number(),
-    account_id: number(),
-    role: string(),
+    organization_id: column.integer(),
+    account_id: column.integer(),
+    role: column.text(),
   },
 })
 
 let invoices = table({
   name: 'billing.invoices',
   columns: {
-    id: number(),
-    account_id: number(),
-    total: number(),
+    id: column.integer(),
+    account_id: column.integer(),
+    total: column.integer(),
   },
 })
 
@@ -362,8 +377,8 @@ describe('query builder', () => {
     })
 
     let db = createTestDatabase(adapter)
-    let nullResult = await db.find(accounts, null)
-    let undefinedResult = await db.find(accounts, undefined)
+    let nullResult = await db.find(accounts, null as never)
+    let undefinedResult = await db.find(accounts, undefined as never)
 
     assert.equal(nullResult, null)
     assert.equal(undefinedResult, null)
@@ -984,6 +999,150 @@ describe('writes and validation', () => {
     )
   })
 
+  it('passes create/update operation context to table validators', async () => {
+    let operations: Array<'create' | 'update'> = []
+    let validatedAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+        ...timestamps(),
+      },
+      timestamps: true,
+      validate({ operation, value }) {
+        operations.push(operation)
+        return { value }
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'a@studio.test', status: 'active' }],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await db.create(validatedAccounts, { id: 2, email: 'b@studio.test', status: 'active' })
+    await db.createMany(validatedAccounts, [{ id: 3, email: 'c@studio.test', status: 'active' }])
+    await db.update(validatedAccounts, 1, { status: 'inactive' })
+    await db.updateMany(
+      validatedAccounts,
+      { status: 'active' },
+      {
+        where: { id: 2 },
+      },
+    )
+
+    assert.deepEqual(operations, ['create', 'create', 'update', 'update'])
+  })
+
+  it('uses create operation for both upsert payloads', async () => {
+    let operations: Array<'create' | 'update'> = []
+    let validatedAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      validate({ operation, value }) {
+        operations.push(operation)
+        return { value }
+      },
+    })
+
+    let adapter = {
+      dialect: 'test',
+      capabilities: {
+        returning: false,
+        savepoints: true,
+        upsert: true,
+        transactionalDdl: false,
+        migrationLock: false,
+      },
+      compileSql() {
+        return []
+      },
+      async execute() {
+        return { affectedRows: 1 }
+      },
+      async migrate() {
+        return {}
+      },
+      async beginTransaction() {
+        return { id: 'tx' }
+      },
+      async commitTransaction() {},
+      async rollbackTransaction() {},
+      async createSavepoint() {},
+      async rollbackToSavepoint() {},
+      async releaseSavepoint() {},
+    } satisfies DatabaseAdapter
+
+    let db = createDatabase(adapter)
+    await db.query(validatedAccounts).upsert(
+      { id: 1, email: 'a@studio.test', status: 'inactive' },
+      { conflictTarget: ['id'], update: { status: 'active' } },
+    )
+
+    assert.deepEqual(operations, ['create', 'create'])
+  })
+
+  it('rejects unknown columns before and after table validation', async () => {
+    let strictAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+        created_at: column.text(),
+        updated_at: column.text(),
+      },
+      validate({ value }) {
+        return {
+          value: {
+            ...value,
+            ghost: true,
+          },
+        }
+      },
+    })
+    let adapter = createAdapter({
+      accounts: [],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await assert.rejects(
+      async () => {
+        await db.create(strictAccounts, { id: 1, email: 'a@studio.test', status: 'active' })
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Unknown column "ghost" for table "accounts"',
+    )
+
+    await assert.rejects(
+      async () => {
+        await db.create(strictAccounts, {
+          id: 1,
+          email: 'a@studio.test',
+          status: 'active',
+          unknown: true,
+        } as never)
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Unknown column "unknown" for table "accounts"',
+    )
+  })
+
   it('throws for update returning when adapter has no RETURNING support', async () => {
     let adapter = createAdapter(
       {
@@ -1298,7 +1457,7 @@ describe('writes and validation', () => {
     )
   })
 
-  it('validates filter values against column schemas at runtime', async () => {
+  it('does not validate filter values at runtime', async () => {
     let adapter = createAdapter({
       accounts: [{ id: 1, email: 'a@studio.test', status: 'active' }],
       projects: [{ id: 100, account_id: 1, name: 'Alpha', archived: false }],
@@ -1308,51 +1467,21 @@ describe('writes and validation', () => {
     })
     let db = createTestDatabase(adapter)
 
-    await assert.rejects(
-      async function () {
-        await db
-          .query(accounts)
-          .where({ id: 'not-a-number' as never })
-          .all()
-      },
-      function (error: unknown) {
-        return (
-          error instanceof DataTableValidationError &&
-          error.message.includes('Invalid filter value for column "id" in table "accounts"')
-        )
-      },
-    )
+    await db
+      .query(accounts)
+      .where({ id: 'not-a-number' as never })
+      .all()
 
-    await assert.rejects(
-      async function () {
-        await db
-          .query(accounts)
-          .join(projects, eq('projects.archived', 'nope' as never))
-          .all()
-      },
-      function (error: unknown) {
-        return (
-          error instanceof DataTableValidationError &&
-          error.message.includes('Invalid filter value for column "archived" in table "projects"')
-        )
-      },
-    )
+    await db
+      .query(accounts)
+      .join(projects, eq('projects.archived', 'nope' as never))
+      .all()
 
-    await assert.rejects(
-      async function () {
-        await db
-          .query(accounts)
-          .groupBy('status')
-          .having(eq('status', 123 as never))
-          .count()
-      },
-      function (error: unknown) {
-        return (
-          error instanceof DataTableValidationError &&
-          error.message.includes('Invalid filter value for column "status" in table "accounts"')
-        )
-      },
-    )
+    await db
+      .query(accounts)
+      .groupBy('status')
+      .having(eq('status', 123 as never))
+      .count()
   })
 })
 

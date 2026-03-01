@@ -4,7 +4,8 @@ import type {
   ForeignKeyAction,
   IndexDefinition,
 } from './adapter.ts'
-import type { ColumnBuilder } from './migrations/column-builder.ts'
+import type { ColumnBuilder } from './column.ts'
+import type { AnyTable } from './table.ts'
 
 /**
  * Controls how each migration is wrapped in transactions.
@@ -49,13 +50,19 @@ export type Migration = {
  * @example
  * ```ts
  * import { createMigration, column as c } from 'remix/data-table/migrations'
+ * import { table } from 'remix/data-table'
+ *
+ * let users = table({
+ *   name: 'users',
+ *   columns: {
+ *     id: c.integer().primaryKey().autoIncrement(),
+ *     email: c.varchar(255).notNull().unique(),
+ *   },
+ * })
  *
  * export default createMigration({
  *   async up({ db }) {
- *     await db.createTable('users', (table) => {
- *       table.addColumn('id', c.integer().primaryKey().autoIncrement())
- *       table.addColumn('email', c.varchar(255).notNull().unique())
- *     })
+ *     await db.createTable(users)
  *   },
  *   async down({ db }) {
  *     await db.dropTable('users', { ifExists: true })
@@ -151,48 +158,6 @@ export type DropTableOptions = { ifExists?: boolean; cascade?: boolean }
 export type IndexColumns = string | string[]
 
 /**
- * Chainable column-constructor namespace exposed as `column`.
- */
-export type ColumnNamespace = {
-  varchar(length: number): ColumnBuilder
-  text(): ColumnBuilder
-  integer(): ColumnBuilder
-  bigint(): ColumnBuilder
-  decimal(precision: number, scale: number): ColumnBuilder
-  boolean(): ColumnBuilder
-  uuid(): ColumnBuilder
-  date(): ColumnBuilder
-  time(options?: { precision?: number; withTimezone?: boolean }): ColumnBuilder
-  timestamp(options?: { precision?: number; withTimezone?: boolean }): ColumnBuilder
-  json(): ColumnBuilder
-  binary(length?: number): ColumnBuilder
-  enum(values: readonly string[]): ColumnBuilder
-}
-
-/**
- * Builder API available inside `db.createTable(name, table => ...)`.
- */
-export interface CreateTableBuilder {
-  addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
-  addPrimaryKey(name: string, columns: string[]): void
-  addUnique(name: string, columns: string[]): void
-  addForeignKey(
-    name: string,
-    columns: string[],
-    refTable: string,
-    refColumns?: string[],
-    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
-  ): void
-  addCheck(name: string, expression: string): void
-  addIndex(
-    name: string,
-    columns: IndexColumns,
-    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
-  ): void
-  comment(text: string): void
-}
-
-/**
  * Builder API available inside `db.alterTable(name, table => ...)`.
  */
 export interface AlterTableBuilder {
@@ -227,11 +192,7 @@ export interface AlterTableBuilder {
  * DDL-focused operations mixed into the migration `db` object.
  */
 export interface MigrationOperations {
-  createTable(
-    name: string,
-    migrate: (table: CreateTableBuilder) => void,
-    options?: CreateTableOptions,
-  ): Promise<void>
+  createTable<table extends AnyTable>(table: table, options?: CreateTableOptions): Promise<void>
   alterTable(
     name: string,
     migrate: (table: AlterTableBuilder) => void,
