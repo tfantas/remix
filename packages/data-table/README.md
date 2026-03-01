@@ -358,7 +358,7 @@ let users = table({
 export default createMigration({
   async up({ db }) {
     await db.createTable(users)
-    await db.createIndex(users, 'users_email_idx', 'email', { unique: true })
+    await db.createIndex(users, 'email', { unique: true })
   },
   async down({ db }) {
     await db.dropTable(users, { ifExists: true })
@@ -446,14 +446,17 @@ For key-oriented migration APIs, single-column and compound forms are both suppo
 
 ```ts
 await db.alterTable(users, (table) => {
-  table.addPrimaryKey('users_pk', 'id')
-  table.addForeignKey('users_account_fk', 'account_id', 'accounts', 'id')
-  table.addForeignKey('users_tenant_account_fk', ['tenant_id', 'account_id'], 'accounts', [
+  table.addPrimaryKey('id')
+  table.addForeignKey('account_id', 'accounts', 'id')
+  table.addForeignKey(['tenant_id', 'account_id'], 'accounts', [
     'tenant_id',
     'id',
   ])
 })
 ```
+
+Constraint and index names are optional in migration APIs. When omitted, `data-table` generates
+deterministic names for primary keys, uniques, foreign keys, checks, and indexes.
 
 This is useful when you want to:
 
