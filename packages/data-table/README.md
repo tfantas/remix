@@ -388,12 +388,12 @@ let dryRunResult = await runner.up({ dryRun: true })
 console.log(dryRunResult.sql)
 ```
 
-You can also pass a pre-built SQL statement into `db.raw(...)` when authoring migrations:
+You can also pass a pre-built SQL statement into `db.plan(...)` when authoring migrations:
 
 ```ts
 import { sql } from 'remix/data-table'
 
-await db.raw(sql`update users set status = ${'active'} where status is null`)
+await db.plan(sql`update users set status = ${'active'} where status is null`)
 ```
 
 This is useful when you want to:

@@ -336,8 +336,8 @@ describe('migration runner', () => {
         })
 
         await db.renameIndex('app.users', 'users_status_idx', 'users_status_idx_v2')
-        await db.raw('vacuum')
-        await db.raw(sql`select ${123}`)
+        await db.plan('vacuum')
+        await db.plan(sql`select ${123}`)
       },
       async down() {},
     })
@@ -634,7 +634,7 @@ describe('migration runner', () => {
         await db.dropForeignKey('app.accounts', 'accounts_fk_global')
         await db.addCheck('app.accounts', 'accounts_global_check', 'id > 0')
         await db.dropCheck('app.accounts', 'accounts_global_check')
-        await db.raw('analyze')
+        await db.plan('analyze')
 
         let journalExists = await db.hasTable('data_table_migrations')
         let idColumnExists = await db.hasColumn('app.accounts', 'id')

@@ -350,7 +350,7 @@ export function createSchemaApi(
         name,
       })
     },
-    async raw(sql) {
+    async plan(sql) {
       let statement = typeof sql === 'string' ? rawSql(sql) : sql
       await emit({
         kind: 'raw',

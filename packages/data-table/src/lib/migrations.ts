@@ -232,7 +232,7 @@ export interface MigrationOperations {
   dropForeignKey(table: string, name: string): Promise<void>
   addCheck(table: string, name: string, expression: string): Promise<void>
   dropCheck(table: string, name: string): Promise<void>
-  raw(sql: string | SqlStatement): Promise<void>
+  plan(sql: string | SqlStatement): Promise<void>
   hasTable(name: string): Promise<boolean>
   hasColumn(table: string, column: string): Promise<boolean>
 }
