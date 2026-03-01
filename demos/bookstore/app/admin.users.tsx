@@ -1,5 +1,6 @@
 import type { Controller } from 'remix/fetch-router'
 import { redirect } from 'remix/response/redirect'
+import { css } from 'remix/component'
 
 import { routes } from './routes.ts'
 import { users } from './data/schema.ts'
@@ -18,7 +19,7 @@ export default {
       <Layout>
         <h1>Manage Users</h1>
 
-        <p css={{ marginBottom: '1rem' }}>
+        <p mix={[css({ marginBottom: '1rem' })]}>
           <a href={routes.admin.index.href()} class="btn btn-secondary">
             Back to Dashboard
           </a>
@@ -50,7 +51,7 @@ export default {
                     <a
                       href={routes.admin.users.edit.href({ userId: u.id })}
                       class="btn btn-secondary"
-                      css={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }}
+                      mix={[css({ fontSize: '0.875rem', padding: '0.25rem 0.5rem' })]}
                     >
                       Edit
                     </a>
@@ -58,12 +59,12 @@ export default {
                       <RestfulForm
                         method="DELETE"
                         action={routes.admin.users.destroy.href({ userId: u.id })}
-                        css={{ display: 'inline' }}
+                        mix={[css({ display: 'inline' })]}
                       >
                         <button
                           type="submit"
                           class="btn btn-danger"
-                          css={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }}
+                          mix={[css({ fontSize: '0.875rem', padding: '0.25rem 0.5rem' })]}
                         >
                           Delete
                         </button>
@@ -115,14 +116,14 @@ export default {
             <strong>Created:</strong> {new Date(targetUser.created_at).toLocaleDateString()}
           </p>
 
-          <div css={{ marginTop: '2rem' }}>
+          <div mix={[css({ marginTop: '2rem' })]}>
             <a href={routes.admin.users.edit.href({ userId: targetUser.id })} class="btn">
               Edit
             </a>
             <a
               href={routes.admin.users.index.href()}
               class="btn btn-secondary"
-              css={{ marginLeft: '0.5rem' }}
+              mix={[css({ marginLeft: '0.5rem' })]}
             >
               Back to List
             </a>
@@ -184,7 +185,7 @@ export default {
             <a
               href={routes.admin.users.index.href()}
               class="btn btn-secondary"
-              css={{ marginLeft: '0.5rem' }}
+              mix={[css({ marginLeft: '0.5rem' })]}
             >
               Cancel
             </a>

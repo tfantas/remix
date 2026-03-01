@@ -2,6 +2,7 @@ import { createRouter } from 'remix/fetch-router'
 import { compression } from 'remix/compression-middleware'
 import { logger } from 'remix/logger-middleware'
 import { staticFiles } from 'remix/static-middleware'
+import { css } from 'remix/component'
 
 import { routes } from './routes.ts'
 import { MessageStream } from './assets/message-stream.tsx'
@@ -36,47 +37,55 @@ router.map(pageRoutes, {
 
     return render(
       <Layout>
-        <h1 css={{ color: '#333', marginBottom: '0.5rem' }}>Server-Sent Events Demo</h1>
-        <p css={{ color: '#666', marginBottom: '2rem' }}>
+        <h1 mix={[css({ color: '#333', marginBottom: '0.5rem' })]}>Server-Sent Events Demo</h1>
+        <p mix={[css({ color: '#666', marginBottom: '2rem' })]}>
           Real-time updates with compression middleware
         </p>
 
         <div
-          css={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-            marginBottom: '1.5rem',
-          }}
+          mix={[
+            css({
+              background: 'white',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+              marginBottom: '1.5rem',
+            }),
+          ]}
         >
           <label
-            css={{
-              display: 'block',
-              fontWeight: 600,
-              marginBottom: '0.5rem',
-              color: '#333',
-            }}
+            mix={[
+              css({
+                display: 'block',
+                fontWeight: 600,
+                marginBottom: '0.5rem',
+                color: '#333',
+              }),
+            ]}
           >
             Compression:
           </label>
           <div
-            css={{
-              padding: '0.5rem',
-              background: '#f8f9fa',
-              borderRadius: '4px',
-              color: '#666',
-            }}
+            mix={[
+              css({
+                padding: '0.5rem',
+                background: '#f8f9fa',
+                borderRadius: '4px',
+                color: '#666',
+              }),
+            ]}
           >
             Encoding is negotiated automatically via{' '}
             <code
-              css={{
-                background: '#f5f5f5',
-                padding: '0.2rem 0.4rem',
-                borderRadius: '3px',
-                fontFamily: "'Courier New', monospace",
-                fontSize: '0.9em',
-              }}
+              mix={[
+                css({
+                  background: '#f5f5f5',
+                  padding: '0.2rem 0.4rem',
+                  borderRadius: '3px',
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: '0.9em',
+                }),
+              ]}
             >
               Accept-Encoding
             </code>{' '}
@@ -84,13 +93,15 @@ router.map(pageRoutes, {
             <br />
             Open DevTools Network tab to see{' '}
             <code
-              css={{
-                background: '#f5f5f5',
-                padding: '0.2rem 0.4rem',
-                borderRadius: '3px',
-                fontFamily: "'Courier New', monospace",
-                fontSize: '0.9em',
-              }}
+              mix={[
+                css({
+                  background: '#f5f5f5',
+                  padding: '0.2rem 0.4rem',
+                  borderRadius: '3px',
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: '0.9em',
+                }),
+              ]}
             >
               Content-Encoding
             </code>{' '}
@@ -99,31 +110,37 @@ router.map(pageRoutes, {
         </div>
 
         <div
-          css={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-            marginBottom: '1.5rem',
-          }}
+          mix={[
+            css({
+              background: 'white',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+              marginBottom: '1.5rem',
+            }),
+          ]}
         >
           <label
-            css={{
-              display: 'block',
-              fontWeight: 600,
-              marginBottom: '0.5rem',
-              color: '#333',
-            }}
+            mix={[
+              css({
+                display: 'block',
+                fontWeight: 600,
+                marginBottom: '0.5rem',
+                color: '#333',
+              }),
+            ]}
           >
             Message Limit:
           </label>
           <div
-            css={{
-              padding: '0.5rem',
-              background: '#f8f9fa',
-              borderRadius: '4px',
-              color: '#666',
-            }}
+            mix={[
+              css({
+                padding: '0.5rem',
+                background: '#f8f9fa',
+                borderRadius: '4px',
+                color: '#666',
+              }),
+            ]}
           >
             {limit ? (
               <>
@@ -132,16 +149,18 @@ router.map(pageRoutes, {
             ) : (
               <>
                 No limit set.{' '}
-                <a href="?limit=10" css={{ color: '#007bff', textDecoration: 'underline' }}>
+                <a href="?limit=10" mix={[css({ color: '#007bff', textDecoration: 'underline' })]}>
                   Add{' '}
                   <code
-                    css={{
-                      background: '#f5f5f5',
-                      padding: '0.2rem 0.4rem',
-                      borderRadius: '3px',
-                      fontFamily: "'Courier New', monospace",
-                      fontSize: '0.9em',
-                    }}
+                    mix={[
+                      css({
+                        background: '#f5f5f5',
+                        padding: '0.2rem 0.4rem',
+                        borderRadius: '3px',
+                        fontFamily: "'Courier New', monospace",
+                        fontSize: '0.9em',
+                      }),
+                    ]}
                   >
                     ?limit=10
                   </code>{' '}
@@ -153,7 +172,7 @@ router.map(pageRoutes, {
           </div>
         </div>
 
-        <MessageStream limit={limit} />
+        <MessageStream setup={{ limit }} />
       </Layout>,
     )
   },

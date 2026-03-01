@@ -1,4 +1,3 @@
-import { TypedEventTarget } from '@remix-run/interaction'
 import type { FrameContent, FrameHandle } from './component.ts'
 import { createFrameHandle } from './component.ts'
 import { invariant } from './invariant.ts'
@@ -6,6 +5,7 @@ import type { RemixNode } from './jsx.ts'
 import { createScheduler, type Scheduler } from './scheduler.ts'
 import { diffVNodes, remove as removeVNode } from './reconcile.ts'
 import { toVNode } from './to-vnode.ts'
+import { TypedEventTarget } from './typed-event-target.ts'
 import { ROOT_VNODE, type VNode } from './vnode.ts'
 import { resetStyleState, defaultStyleManager } from './diff-props.ts'
 import type { StyleManager } from './style/index.ts'
@@ -188,20 +188,25 @@ function createRootFrameHandle(init: {
   scheduler: Scheduler
   styleManager: StyleManager
 }): FrameHandle {
-  if (!init.resolveFrame) {
-    return createFrameHandle({ src: init.src ?? '/' })
-  }
+  let resolveFrame =
+    init.resolveFrame ??
+    (() => {
+      throw new Error(
+        'Cannot render <Frame /> without frame runtime. Use run() or pass frameInit to createRoot/createRangeRoot.',
+      )
+    })
 
   let frame = createFrameHandle({
     src: init.src ?? '/',
     $runtime: {
+      canResolveFrames: !!init.resolveFrame,
       topFrame: undefined,
       loadModule:
         init.loadModule ??
         (() => {
           throw new Error('loadModule is required to hydrate client entries inside <Frame />')
         }),
-      resolveFrame: init.resolveFrame,
+      resolveFrame,
       pendingClientEntries: new Map(),
       scheduler: init.scheduler,
       styleManager: init.styleManager,
