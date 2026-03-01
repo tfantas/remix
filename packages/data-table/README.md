@@ -10,6 +10,7 @@ Typed relational query toolkit for JavaScript runtimes.
 - **Validated Writes and Filters**: Values are parsed with your `remix/data-schema` schemas
 - **Relation-First Queries**: `hasMany`, `hasOne`, `belongsTo`, `hasManyThrough`, and nested eager loading
 - **Safe Scoped Writes**: `update`/`delete` with `orderBy`/`limit` run safely in a transaction
+- **First-Class Migrations**: Up/down migrations with schema builders, runner controls, and dry-run planning
 - **Raw SQL Escape Hatch**: Execute SQL directly with `db.exec(sql\`...\`)`
 
 `data-table` gives you two complementary APIs:
@@ -286,7 +287,7 @@ is handled by adapter-owned compilers (with optional shared pure helpers from `d
 For adapter authors (including third-party adapters), shared SQL helper utilities are available at
 `remix/data-table/sql-helpers`.
 
-### Typical Setup (Node.js)
+### Example Setup
 
 ```txt
 app/
@@ -322,6 +323,8 @@ export default createMigration({
 ```
 
 ### Runner Script Example
+
+In `app/db/migrate.ts`:
 
 ```ts
 import path from 'node:path'
