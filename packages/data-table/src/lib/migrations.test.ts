@@ -622,11 +622,11 @@ describe('migration runner', () => {
           table.changeColumn('status', column.varchar(20).notNull())
           table.renameColumn('status', 'account_status')
           table.dropColumn('legacy_status', { ifExists: true })
-          table.addPrimaryKey('accounts_pk_v2', ['id'])
+          table.addPrimaryKey('accounts_pk_v2', 'id')
           table.dropPrimaryKey('accounts_pk_v2')
           table.addUnique('accounts_status_uq', ['account_status'])
           table.dropUnique('accounts_status_uq')
-          table.addForeignKey('accounts_self_fk', ['id'], accountsTable, ['id'])
+          table.addForeignKey('accounts_self_fk', 'id', accountsTable, 'id')
           table.dropForeignKey('accounts_self_fk')
           table.addCheck('accounts_status_check', "account_status in ('active', 'disabled')")
           table.dropCheck('accounts_status_check')
@@ -642,7 +642,7 @@ describe('migration runner', () => {
         })
         await db.dropIndex(accountsTable, 'accounts_compound_idx', { ifExists: true })
         await db.renameIndex(accountsTable, 'accounts_old_idx', 'accounts_new_idx')
-        await db.addForeignKey(accountsTable, 'accounts_fk_global', ['id'], authUsersTable, undefined, {
+        await db.addForeignKey(accountsTable, 'accounts_fk_global', 'id', authUsersTable, undefined, {
           onDelete: 'cascade',
           onUpdate: 'restrict',
         })
@@ -682,6 +682,35 @@ describe('migration runner', () => {
       'dropCheck',
       'raw',
     ])
+
+    let alterTableOperation = adapter.migratedOperations[2]
+    assert.equal(alterTableOperation?.kind, 'alterTable')
+    if (alterTableOperation.kind !== 'alterTable') {
+      throw new Error('Expected alterTable operation at index 2')
+    }
+
+    let addPrimaryKeyChange = alterTableOperation.changes.find((change) => change.kind === 'addPrimaryKey')
+    assert.ok(addPrimaryKeyChange)
+    if (!addPrimaryKeyChange || addPrimaryKeyChange.kind !== 'addPrimaryKey') {
+      throw new Error('Expected addPrimaryKey change')
+    }
+    assert.deepEqual(addPrimaryKeyChange.constraint.columns, ['id'])
+
+    let addForeignKeyChange = alterTableOperation.changes.find((change) => change.kind === 'addForeignKey')
+    assert.ok(addForeignKeyChange)
+    if (!addForeignKeyChange || addForeignKeyChange.kind !== 'addForeignKey') {
+      throw new Error('Expected addForeignKey change')
+    }
+    assert.deepEqual(addForeignKeyChange.constraint.columns, ['id'])
+    assert.deepEqual(addForeignKeyChange.constraint.references.columns, ['id'])
+
+    let addForeignKeyOperation = adapter.migratedOperations[10]
+    assert.equal(addForeignKeyOperation?.kind, 'addForeignKey')
+    if (addForeignKeyOperation.kind !== 'addForeignKey') {
+      throw new Error('Expected addForeignKey operation at index 10')
+    }
+    assert.deepEqual(addForeignKeyOperation.constraint.columns, ['id'])
+    assert.deepEqual(addForeignKeyOperation.constraint.references.columns, ['id'])
   })
 
   it('returns false for table and column checks when dryRun database blocks execution', async () => {

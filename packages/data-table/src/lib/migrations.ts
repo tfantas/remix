@@ -175,6 +175,11 @@ export type DropTableOptions = { ifExists?: boolean; cascade?: boolean }
 export type IndexColumns = string | string[]
 
 /**
+ * Accepts either one key column or multiple (compound key).
+ */
+export type KeyColumns = string | string[]
+
+/**
  * Accepts either a SQL table name or a `table(...)` object.
  */
 export type TableInput = string | AnyTable
@@ -187,15 +192,15 @@ export interface AlterTableBuilder {
   changeColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
   renameColumn(from: string, to: string): void
   dropColumn(name: string, options?: { ifExists?: boolean }): void
-  addPrimaryKey(name: string, columns: string[]): void
+  addPrimaryKey(name: string, columns: KeyColumns): void
   dropPrimaryKey(name: string): void
   addUnique(name: string, columns: string[]): void
   dropUnique(name: string): void
   addForeignKey(
     name: string,
-    columns: string[],
+    columns: KeyColumns,
     refTable: TableInput,
-    refColumns?: string[],
+    refColumns?: KeyColumns,
     options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
   dropForeignKey(name: string): void
@@ -233,9 +238,9 @@ export interface MigrationOperations {
   addForeignKey(
     table: TableInput,
     name: string,
-    columns: string[],
+    columns: KeyColumns,
     refTable: TableInput,
-    refColumns?: string[],
+    refColumns?: KeyColumns,
     options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): Promise<void>
   dropForeignKey(table: TableInput, name: string): Promise<void>

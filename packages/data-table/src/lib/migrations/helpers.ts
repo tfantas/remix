@@ -1,5 +1,5 @@
 import type { TableRef } from '../adapter.ts'
-import type { IndexColumns } from '../migrations.ts'
+import type { IndexColumns, KeyColumns } from '../migrations.ts'
 
 export function toTableRef(name: string): TableRef {
   let segments = name.split('.')
@@ -15,6 +15,10 @@ export function toTableRef(name: string): TableRef {
 }
 
 export function normalizeIndexColumns(columns: IndexColumns): string[] {
+  return normalizeKeyColumns(columns)
+}
+
+export function normalizeKeyColumns(columns: KeyColumns): string[] {
   if (Array.isArray(columns)) {
     return [...columns]
   }

@@ -16,6 +16,7 @@ export type {
   MigrationTransactionMode,
   MigrateOptions,
   MigrateResult,
+  KeyColumns,
   TableInput,
 } from './lib/migrations.ts'
 export {

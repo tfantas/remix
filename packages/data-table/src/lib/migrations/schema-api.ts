@@ -19,10 +19,10 @@ import {
   getTablePrimaryKey,
 } from '../table.ts'
 import type { AnyTable } from '../table.ts'
-import type { AlterTableBuilder, MigrationOperations, TableInput } from '../migrations.ts'
+import type { AlterTableBuilder, KeyColumns, MigrationOperations, TableInput } from '../migrations.ts'
 
 import { ColumnBuilder } from '../column.ts'
-import { normalizeIndexColumns, toTableRef } from './helpers.ts'
+import { normalizeIndexColumns, normalizeKeyColumns, toTableRef } from './helpers.ts'
 
 function asColumnDefinition(definition: ColumnDefinition | ColumnBuilder): ColumnDefinition {
   if (definition instanceof ColumnBuilder) {
@@ -168,10 +168,10 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropColumn', column: name, ifExists: options?.ifExists })
   }
 
-  addPrimaryKey(name: string, columns: string[]): void {
+  addPrimaryKey(name: string, columns: KeyColumns): void {
     this.alterChanges.push({
       kind: 'addPrimaryKey',
-      constraint: { columns: [...columns], name },
+      constraint: { columns: normalizeKeyColumns(columns), name },
     })
   }
 
@@ -192,18 +192,18 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 
   addForeignKey(
     name: string,
-    columns: string[],
+    columns: KeyColumns,
     refTable: TableInput,
-    refColumns?: string[],
+    refColumns?: KeyColumns,
     options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void {
     this.alterChanges.push({
       kind: 'addForeignKey',
       constraint: {
-        columns: [...columns],
+        columns: normalizeKeyColumns(columns),
         references: {
           table: asTableRef(refTable),
-          columns: refColumns ? [...refColumns] : ['id'],
+          columns: refColumns ? normalizeKeyColumns(refColumns) : ['id'],
         },
         name,
         onDelete: options?.onDelete,
@@ -327,10 +327,10 @@ export function createSchemaApi(
         kind: 'addForeignKey',
         table: asTableRef(table),
         constraint: {
-          columns: [...columns],
+          columns: normalizeKeyColumns(columns),
           references: {
             table: asTableRef(refTable),
-            columns: refColumns ? [...refColumns] : ['id'],
+            columns: refColumns ? normalizeKeyColumns(refColumns) : ['id'],
           },
           name,
           onDelete: options?.onDelete,
