@@ -93,7 +93,10 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
         name: String(name),
         checksum: String(checksum),
         batch: Number(batch),
-        applied_at: String(appliedAt),
+        applied_at:
+          typeof appliedAt === 'string' && appliedAt.length > 0
+            ? appliedAt
+            : new Date().toISOString(),
       })
 
       return { affectedRows: 1 }
@@ -327,15 +330,15 @@ describe('migration runner', () => {
           },
         })
         await db.createTable(usersTable)
-        await db.createIndex('app.users', 'users_email_idx', 'email', { unique: true })
+        await db.createIndex(usersTable, 'users_email_idx', 'email', { unique: true })
 
-        await db.alterTable('app.users', (table) => {
+        await db.alterTable(usersTable, (table) => {
           table.addColumn('status', column.text().default('active'))
           table.addCheck('users_status_check', "status in ('active', 'disabled')")
           table.addIndex('users_status_idx', 'status')
         })
 
-        await db.renameIndex('app.users', 'users_status_idx', 'users_status_idx_v2')
+        await db.renameIndex(usersTable, 'users_status_idx', 'users_status_idx_v2')
         await db.plan('vacuum')
         await db.plan(sql`select ${123}`)
       },
@@ -595,14 +598,26 @@ describe('migration runner', () => {
             nickname: column.text(),
           },
         })
+        let accountsV2Table = table({
+          name: 'app.accounts_v2',
+          columns: {
+            id: column.integer().primaryKey(),
+          },
+        })
+        let authUsersTable = table({
+          name: 'auth.users',
+          columns: {
+            id: column.integer().primaryKey(),
+          },
+        })
         await db.createTable(accountsTable)
-        await db.createIndex('app.accounts', 'accounts_email_idx', ['email', 'id'], {
+        await db.createIndex(accountsTable, 'accounts_email_idx', ['email', 'id'], {
           unique: true,
           where: 'id > 0',
           using: 'btree',
         })
 
-        await db.alterTable('app.accounts', (table) => {
+        await db.alterTable(accountsTable, (table) => {
           table.addColumn('status', column.text().default('active'))
           table.changeColumn('status', column.varchar(20).notNull())
           table.renameColumn('status', 'account_status')
@@ -611,7 +626,7 @@ describe('migration runner', () => {
           table.dropPrimaryKey('accounts_pk_v2')
           table.addUnique('accounts_status_uq', ['account_status'])
           table.dropUnique('accounts_status_uq')
-          table.addForeignKey('accounts_self_fk', ['id'], 'app.accounts', ['id'])
+          table.addForeignKey('accounts_self_fk', ['id'], accountsTable, ['id'])
           table.dropForeignKey('accounts_self_fk')
           table.addCheck('accounts_status_check', "account_status in ('active', 'disabled')")
           table.dropCheck('accounts_status_check')
@@ -620,26 +635,26 @@ describe('migration runner', () => {
           table.comment('Accounts table v2')
         })
 
-        await db.renameTable('app.accounts', 'app.accounts_v2')
-        await db.dropTable('app.accounts_v2', { ifExists: true, cascade: true })
-        await db.createIndex('app.accounts', 'accounts_compound_idx', ['id', 'email'], {
+        await db.renameTable(accountsTable, accountsV2Table)
+        await db.dropTable(accountsV2Table, { ifExists: true, cascade: true })
+        await db.createIndex(accountsTable, 'accounts_compound_idx', ['id', 'email'], {
           unique: true,
         })
-        await db.dropIndex('app.accounts', 'accounts_compound_idx', { ifExists: true })
-        await db.renameIndex('app.accounts', 'accounts_old_idx', 'accounts_new_idx')
-        await db.addForeignKey('app.accounts', 'accounts_fk_global', ['id'], 'auth.users', undefined, {
+        await db.dropIndex(accountsTable, 'accounts_compound_idx', { ifExists: true })
+        await db.renameIndex(accountsTable, 'accounts_old_idx', 'accounts_new_idx')
+        await db.addForeignKey(accountsTable, 'accounts_fk_global', ['id'], authUsersTable, undefined, {
           onDelete: 'cascade',
           onUpdate: 'restrict',
         })
-        await db.dropForeignKey('app.accounts', 'accounts_fk_global')
-        await db.addCheck('app.accounts', 'accounts_global_check', 'id > 0')
-        await db.dropCheck('app.accounts', 'accounts_global_check')
+        await db.dropForeignKey(accountsTable, 'accounts_fk_global')
+        await db.addCheck(accountsTable, 'accounts_global_check', 'id > 0')
+        await db.dropCheck(accountsTable, 'accounts_global_check')
         await db.plan('analyze')
 
-        let journalExists = await db.hasTable('data_table_migrations')
-        let idColumnExists = await db.hasColumn('app.accounts', 'id')
+        let accountsExists = await db.hasTable(accountsTable)
+        let idColumnExists = await db.hasColumn(accountsTable, 'id')
 
-        if (!journalExists || !idColumnExists) {
+        if (!accountsExists || !idColumnExists) {
           throw new Error('Expected schema introspection checks to succeed')
         }
       },

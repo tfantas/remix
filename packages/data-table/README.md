@@ -358,10 +358,10 @@ let users = table({
 export default createMigration({
   async up({ db }) {
     await db.createTable(users)
-    await db.createIndex('users', 'users_email_idx', 'email', { unique: true })
+    await db.createIndex(users, 'users_email_idx', 'email', { unique: true })
   },
   async down({ db }) {
-    await db.dropTable('users', { ifExists: true })
+    await db.dropTable(users, { ifExists: true })
   },
 })
 ```
@@ -439,7 +439,8 @@ await db.plan(sql`update users set status = ${'active'} where status is null`)
 ```
 
 You can run lightweight schema checks inside a migration with `db.hasTable(...)` and
-`db.hasColumn(...)` when you need defensive conditional behavior.
+`db.hasColumn(...)` when you need defensive conditional behavior. Methods that take a table name
+accept either a string (`'app.users'`) or a `table(...)` object.
 
 This is useful when you want to:
 

@@ -175,6 +175,11 @@ export type DropTableOptions = { ifExists?: boolean; cascade?: boolean }
 export type IndexColumns = string | string[]
 
 /**
+ * Accepts either a SQL table name or a `table(...)` object.
+ */
+export type TableInput = string | AnyTable
+
+/**
  * Builder API available inside `db.alterTable(name, table => ...)`.
  */
 export interface AlterTableBuilder {
@@ -189,7 +194,7 @@ export interface AlterTableBuilder {
   addForeignKey(
     name: string,
     columns: string[],
-    refTable: string,
+    refTable: TableInput,
     refColumns?: string[],
     options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
@@ -211,31 +216,31 @@ export interface AlterTableBuilder {
 export interface MigrationOperations {
   createTable<table extends AnyTable>(table: table, options?: CreateTableOptions): Promise<void>
   alterTable(
-    name: string,
+    table: TableInput,
     migrate: (table: AlterTableBuilder) => void,
     options?: AlterTableOptions,
   ): Promise<void>
-  renameTable(from: string, to: string): Promise<void>
-  dropTable(name: string, options?: DropTableOptions): Promise<void>
+  renameTable(from: TableInput, to: TableInput): Promise<void>
+  dropTable(table: TableInput, options?: DropTableOptions): Promise<void>
   createIndex(
-    table: string,
+    table: TableInput,
     name: string,
     columns: IndexColumns,
     options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
   ): Promise<void>
-  dropIndex(table: string, name: string, options?: { ifExists?: boolean }): Promise<void>
-  renameIndex(table: string, from: string, to: string): Promise<void>
+  dropIndex(table: TableInput, name: string, options?: { ifExists?: boolean }): Promise<void>
+  renameIndex(table: TableInput, from: string, to: string): Promise<void>
   addForeignKey(
-    table: string,
+    table: TableInput,
     name: string,
     columns: string[],
-    refTable: string,
+    refTable: TableInput,
     refColumns?: string[],
     options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): Promise<void>
-  dropForeignKey(table: string, name: string): Promise<void>
-  addCheck(table: string, name: string, expression: string): Promise<void>
-  dropCheck(table: string, name: string): Promise<void>
+  dropForeignKey(table: TableInput, name: string): Promise<void>
+  addCheck(table: TableInput, name: string, expression: string): Promise<void>
+  dropCheck(table: TableInput, name: string): Promise<void>
   /**
    * Adds raw SQL to the migration plan as a migration operation.
    */
@@ -243,11 +248,11 @@ export interface MigrationOperations {
   /**
    * Returns `true` when the table exists in the current database.
    */
-  hasTable(name: string): Promise<boolean>
+  hasTable(table: TableInput): Promise<boolean>
   /**
    * Returns `true` when the column exists on the given table.
    */
-  hasColumn(table: string, column: string): Promise<boolean>
+  hasColumn(table: TableInput, column: string): Promise<boolean>
 }
 
 /**

@@ -19,7 +19,7 @@ import {
   getTablePrimaryKey,
 } from '../table.ts'
 import type { AnyTable } from '../table.ts'
-import type { AlterTableBuilder, MigrationOperations } from '../migrations.ts'
+import type { AlterTableBuilder, MigrationOperations, TableInput } from '../migrations.ts'
 
 import { ColumnBuilder } from '../column.ts'
 import { normalizeIndexColumns, toTableRef } from './helpers.ts'
@@ -30,6 +30,18 @@ function asColumnDefinition(definition: ColumnDefinition | ColumnBuilder): Colum
   }
 
   return definition
+}
+
+function asTableName(value: TableInput): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  return getTableName(value)
+}
+
+function asTableRef(value: TableInput): TableRef {
+  return toTableRef(asTableName(value))
 }
 
 function normalizeTableIdentifier(value: string): string {
@@ -181,7 +193,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
   addForeignKey(
     name: string,
     columns: string[],
-    refTable: string,
+    refTable: TableInput,
     refColumns?: string[],
     options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void {
@@ -190,7 +202,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
       constraint: {
         columns: [...columns],
         references: {
-          table: toTableRef(refTable),
+          table: asTableRef(refTable),
           columns: refColumns ? [...refColumns] : ['id'],
         },
         name,
@@ -254,15 +266,15 @@ export function createSchemaApi(
       operation.ifNotExists = options?.ifNotExists
       await emit(operation)
     },
-    async alterTable(name, migrate, options) {
-      let table = toTableRef(name)
-      let builder = new AlterTableBuilderRuntime(table)
+    async alterTable(input, migrate, options) {
+      let tableRef = asTableRef(input)
+      let builder = new AlterTableBuilderRuntime(tableRef)
       migrate(builder)
 
       if (builder.alterChanges.length > 0) {
         await emit({
           kind: 'alterTable',
-          table,
+          table: tableRef,
           changes: builder.alterChanges,
           ifExists: options?.ifExists,
         })
@@ -273,12 +285,12 @@ export function createSchemaApi(
       }
     },
     async renameTable(from, to) {
-      await emit({ kind: 'renameTable', from: toTableRef(from), to: toTableRef(to) })
+      await emit({ kind: 'renameTable', from: asTableRef(from), to: asTableRef(to) })
     },
-    async dropTable(name, options) {
+    async dropTable(table, options) {
       await emit({
         kind: 'dropTable',
-        table: toTableRef(name),
+        table: asTableRef(table),
         ifExists: options?.ifExists,
         cascade: options?.cascade,
       })
@@ -287,7 +299,7 @@ export function createSchemaApi(
       await emit({
         kind: 'createIndex',
         index: {
-          table: toTableRef(table),
+          table: asTableRef(table),
           name,
           columns: normalizeIndexColumns(columns),
           ...options,
@@ -297,7 +309,7 @@ export function createSchemaApi(
     async dropIndex(table, name, options) {
       await emit({
         kind: 'dropIndex',
-        table: toTableRef(table),
+        table: asTableRef(table),
         name,
         ifExists: options?.ifExists,
       })
@@ -305,7 +317,7 @@ export function createSchemaApi(
     async renameIndex(table, from, to) {
       await emit({
         kind: 'renameIndex',
-        table: toTableRef(table),
+        table: asTableRef(table),
         from,
         to,
       })
@@ -313,11 +325,11 @@ export function createSchemaApi(
     async addForeignKey(table, name, columns, refTable, refColumns, options) {
       await emit({
         kind: 'addForeignKey',
-        table: toTableRef(table),
+        table: asTableRef(table),
         constraint: {
           columns: [...columns],
           references: {
-            table: toTableRef(refTable),
+            table: asTableRef(refTable),
             columns: refColumns ? [...refColumns] : ['id'],
           },
           name,
@@ -329,14 +341,14 @@ export function createSchemaApi(
     async dropForeignKey(table, name) {
       await emit({
         kind: 'dropForeignKey',
-        table: toTableRef(table),
+        table: asTableRef(table),
         name,
       })
     },
     async addCheck(table, name, expression) {
       await emit({
         kind: 'addCheck',
-        table: toTableRef(table),
+        table: asTableRef(table),
         constraint: {
           expression,
           name,
@@ -346,7 +358,7 @@ export function createSchemaApi(
     async dropCheck(table, name) {
       await emit({
         kind: 'dropCheck',
-        table: toTableRef(table),
+        table: asTableRef(table),
         name,
       })
     },
@@ -357,17 +369,19 @@ export function createSchemaApi(
         sql: statement,
       })
     },
-    async hasTable(name) {
+    async hasTable(table) {
+      let tableName = asTableName(table)
       try {
-        await db.exec(rawSql('select 1 from ' + name + ' limit 1'))
+        await db.exec(rawSql('select 1 from ' + tableName + ' limit 1'))
         return true
       } catch {
         return false
       }
     },
     async hasColumn(table, columnName) {
+      let tableName = asTableName(table)
       try {
-        await db.exec(rawSql('select ' + columnName + ' from ' + table + ' where 1 = 0'))
+        await db.exec(rawSql('select ' + columnName + ' from ' + tableName + ' where 1 = 0'))
         return true
       } catch {
         return false
