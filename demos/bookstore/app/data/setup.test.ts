@@ -6,6 +6,10 @@ import { loadMigrations } from 'remix/data-table/migrations/node'
 
 import { db, initializeBookstoreDatabase } from './setup.ts'
 
+function getRows(result: { rows?: Record<string, unknown>[] }): Record<string, unknown>[] {
+  return result.rows ?? []
+}
+
 function readRowString(row: Record<string, unknown>, key: string): string {
   let value = row[key]
 
@@ -42,10 +46,11 @@ describe('bookstore database setup', () => {
     let migrations = await loadMigrations(migrationsPath)
 
     let journalResult = await db.exec(sql`select id, name from data_table_migrations order by id asc`)
-    let journalIds = journalResult.rows.map((row) => readRowString(row, 'id'))
+    let journalRows = getRows(journalResult)
+    let journalIds = journalRows.map((row) => readRowString(row, 'id'))
     let migrationIds = migrations.map((migration) => migration.id)
 
-    assert.equal(journalResult.rows.length, migrations.length)
+    assert.equal(journalRows.length, migrations.length)
     assert.deepEqual(journalIds, migrationIds)
 
     assert.equal(await db.adapter.hasTable({ name: 'books' }), true)
@@ -65,20 +70,24 @@ describe('bookstore database setup', () => {
       sql`select name from sqlite_master where type = 'index' and name = 'order_items_order_id_idx'`,
     )
 
-    assert.equal(ordersIndex.rows.length, 1)
-    assert.equal(orderItemsOrderIndex.rows.length, 1)
+    assert.equal(getRows(ordersIndex).length, 1)
+    assert.equal(getRows(orderItemsOrderIndex).length, 1)
   })
 
   it('does not duplicate migration journal entries when initialized more than once', async () => {
     await initializeBookstoreDatabase()
 
     let before = await db.exec(sql`select count(*) as count from data_table_migrations`)
-    let beforeCount = readRowCount(before.rows[0], 'count')
+    let beforeRows = getRows(before)
+    assert.ok(beforeRows.length > 0)
+    let beforeCount = readRowCount(beforeRows[0], 'count')
 
     await initializeBookstoreDatabase()
 
     let after = await db.exec(sql`select count(*) as count from data_table_migrations`)
-    let afterCount = readRowCount(after.rows[0], 'count')
+    let afterRows = getRows(after)
+    assert.ok(afterRows.length > 0)
+    let afterCount = readRowCount(afterRows[0], 'count')
 
     assert.equal(afterCount, beforeCount)
   })
