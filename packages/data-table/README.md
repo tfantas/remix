@@ -442,6 +442,19 @@ You can run lightweight schema checks inside a migration with `db.hasTable(...)`
 `db.hasColumn(...)` when you need defensive conditional behavior. Methods that take a table name
 accept either a string (`'app.users'`) or a `table(...)` object.
 
+For key-oriented migration APIs, single-column and compound forms are both supported:
+
+```ts
+await db.alterTable(users, (table) => {
+  table.addPrimaryKey('users_pk', 'id')
+  table.addForeignKey('users_account_fk', 'account_id', 'accounts', 'id')
+  table.addForeignKey('users_tenant_account_fk', ['tenant_id', 'account_id'], 'accounts', [
+    'tenant_id',
+    'id',
+  ])
+})
+```
+
 This is useful when you want to:
 
 - Review generated SQL in CI before deploying
