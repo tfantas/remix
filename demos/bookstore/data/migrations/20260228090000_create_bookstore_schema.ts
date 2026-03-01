@@ -51,7 +51,7 @@ export default createMigration({
       },
     })
     await db.createTable(orders)
-    await db.createIndex('orders', 'orders_user_id_idx', 'user_id')
+    await db.createIndex('orders', 'user_id', { name: 'orders_user_id_idx' })
 
     let orderItems = table({
       name: 'order_items',
@@ -73,8 +73,8 @@ export default createMigration({
       },
     })
     await db.createTable(orderItems)
-    await db.createIndex('order_items', 'order_items_order_id_idx', 'order_id')
-    await db.createIndex('order_items', 'order_items_book_id_idx', 'book_id')
+    await db.createIndex('order_items', 'order_id', { name: 'order_items_order_id_idx' })
+    await db.createIndex('order_items', 'book_id', { name: 'order_items_book_id_idx' })
 
     let passwordResetTokens = table({
       name: 'password_reset_tokens',
@@ -90,7 +90,7 @@ export default createMigration({
       },
     })
     await db.createTable(passwordResetTokens)
-    await db.createIndex('password_reset_tokens', 'password_reset_tokens_user_id_idx', 'user_id')
+    await db.createIndex('password_reset_tokens', 'user_id', { name: 'password_reset_tokens_user_id_idx' })
   },
   async down({ db }) {
     await db.dropTable('password_reset_tokens', { ifExists: true })
