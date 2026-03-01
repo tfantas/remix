@@ -363,6 +363,14 @@ try {
 }
 ```
 
+Use `journalTable` if you want a custom migrations journal table name:
+
+```ts
+let runner = createMigrationRunner(adapter, migrations, {
+  journalTable: 'app_migrations',
+})
+```
+
 Run it with your runtime, for example:
 
 ```sh
@@ -395,6 +403,9 @@ import { sql } from 'remix/data-table'
 
 await db.plan(sql`update users set status = ${'active'} where status is null`)
 ```
+
+You can run lightweight schema checks inside a migration with `db.hasTable(...)` and
+`db.hasColumn(...)` when you need defensive conditional behavior.
 
 This is useful when you want to:
 

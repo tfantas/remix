@@ -150,6 +150,10 @@ export type MigrateOptions =
 export type MigrateResult = {
   applied: MigrationStatusEntry[]
   reverted: MigrationStatusEntry[]
+  /**
+   * Compiled SQL statements for operations processed during this run.
+   * Includes planned SQL when running with `dryRun: true`.
+   */
   sql: SqlStatement[]
 }
 
@@ -232,8 +236,17 @@ export interface MigrationOperations {
   dropForeignKey(table: string, name: string): Promise<void>
   addCheck(table: string, name: string, expression: string): Promise<void>
   dropCheck(table: string, name: string): Promise<void>
+  /**
+   * Adds raw SQL to the migration plan as a migration operation.
+   */
   plan(sql: string | SqlStatement): Promise<void>
+  /**
+   * Returns `true` when the table exists in the current database.
+   */
   hasTable(name: string): Promise<boolean>
+  /**
+   * Returns `true` when the column exists on the given table.
+   */
   hasColumn(table: string, column: string): Promise<boolean>
 }
 
@@ -249,6 +262,10 @@ export type MigrationRegistry = {
  * Options for creating a migration runner.
  */
 export type MigrationRunnerOptions = {
+  /**
+   * Journal table used to record applied migrations.
+   * Defaults to `data_table_migrations`.
+   */
   journalTable?: string
 }
 

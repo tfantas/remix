@@ -475,6 +475,9 @@ export type DataManipulationResult = {
  * Adapter data-migration result payload.
  */
 export type DataMigrationResult = {
+  /**
+   * Number of migration operations processed by the adapter call.
+   */
   affectedOperations?: number
 }
 

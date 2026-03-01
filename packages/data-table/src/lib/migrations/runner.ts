@@ -283,7 +283,9 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
  * ```ts
  * import { createMigrationRunner } from 'remix/data-table/migrations'
  *
- * let runner = createMigrationRunner(adapter, migrations)
+ * let runner = createMigrationRunner(adapter, migrations, {
+ *   journalTable: 'app_migrations',
+ * })
  * await runner.up()
  * ```
  */
