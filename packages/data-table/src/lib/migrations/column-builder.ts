@@ -5,9 +5,16 @@ import type {
 } from '../adapter.ts'
 import { toTableRef } from './helpers.ts'
 
+/**
+ * Chainable builder used to describe database column definitions in migrations.
+ */
 export class ColumnBuilder {
   #definition: ColumnDefinition
 
+  /**
+   * Creates a column builder from an initial column definition.
+   * @param definition Initial canonical column definition.
+   */
   constructor(definition: ColumnDefinition) {
     this.#definition = definition
   }
@@ -55,17 +62,25 @@ export class ColumnBuilder {
     return this
   }
 
+  /**
+   * Adds a named foreign-key reference for this column.
+   */
+  references(table: string, name: string): ColumnBuilder
+  references(table: string, columns: string | string[], name: string): ColumnBuilder
   references(
     table: string,
-    columns: string | string[] = 'id',
-    options?: { name?: string },
+    columnsOrName: string | string[],
+    maybeName?: string,
   ): ColumnBuilder {
+    let columns = maybeName === undefined ? 'id' : columnsOrName
+    let name = maybeName === undefined ? String(columnsOrName) : maybeName
+
     this.#definition.references = {
       table: toTableRef(table),
       columns: Array.isArray(columns) ? [...columns] : [columns],
       onDelete: this.#definition.references?.onDelete,
       onUpdate: this.#definition.references?.onUpdate,
-      name: options?.name ?? this.#definition.references?.name,
+      name,
     }
     return this
   }
@@ -88,7 +103,7 @@ export class ColumnBuilder {
     return this
   }
 
-  check(expression: string, name?: string): ColumnBuilder {
+  check(expression: string, name: string): ColumnBuilder {
     let checks = this.#definition.checks ?? []
 
     checks.push({ expression, name })
@@ -168,6 +183,9 @@ export class ColumnBuilder {
   }
 }
 
+/**
+ * Public constructor namespace for column builders.
+ */
 export type ColumnNamespace = {
   varchar(length: number): ColumnBuilder
   text(): ColumnBuilder
@@ -188,6 +206,15 @@ function createColumnBuilder(type: ColumnDefinition['type']): ColumnBuilder {
   return new ColumnBuilder({ type })
 }
 
+/**
+ * Chainable column builder namespace used by migrations.
+ * @example
+ * ```ts
+ * import { column as c } from 'remix/data-table/migrations'
+ *
+ * let email = c.varchar(255).notNull().unique('users_email_uq')
+ * ```
+ */
 export let column: ColumnNamespace = {
   varchar(length: number) {
     return new ColumnBuilder({ type: 'varchar', length })

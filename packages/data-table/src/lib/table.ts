@@ -384,6 +384,20 @@ export function validatePartialRow<table extends AnyTable>(
  * Creates a table object with symbol-backed metadata and direct column references.
  * @param options Table declaration options.
  * @returns A frozen table object.
+ * @example
+ * ```ts
+ * import { table } from 'remix/data-table'
+ * import { number, string } from 'remix/data-schema'
+ *
+ * let users = table({
+ *   name: 'users',
+ *   columns: {
+ *     id: number(),
+ *     email: string(),
+ *   },
+ *   primaryKey: 'id',
+ * })
+ * ```
  */
 export function table<
   name extends string,

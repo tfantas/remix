@@ -38,19 +38,20 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
     this.columns[name] = asColumnDefinition(definition)
   }
 
-  addPrimaryKey(columns: string[], options?: { name?: string }): void {
-    this.primaryKey = { columns: [...columns], name: options?.name }
+  addPrimaryKey(name: string, columns: string[]): void {
+    this.primaryKey = { columns: [...columns], name }
   }
 
-  addUnique(columns: string[], options?: { name?: string }): void {
-    this.uniques.push({ columns: [...columns], name: options?.name })
+  addUnique(name: string, columns: string[]): void {
+    this.uniques.push({ columns: [...columns], name })
   }
 
   addForeignKey(
+    name: string,
     columns: string[],
     refTable: string,
     refColumns?: string[],
-    options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void {
     this.foreignKeys.push({
       columns: [...columns],
@@ -58,7 +59,7 @@ class CreateTableBuilderRuntime implements CreateTableBuilder {
         table: toTableRef(refTable),
         columns: refColumns ? [...refColumns] : ['id'],
       },
-      name: options?.name,
+      name,
       onDelete: options?.onDelete,
       onUpdate: options?.onUpdate,
     })
@@ -114,21 +115,21 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropColumn', column: name, ifExists: options?.ifExists })
   }
 
-  addPrimaryKey(columns: string[], options?: { name?: string }): void {
+  addPrimaryKey(name: string, columns: string[]): void {
     this.alterChanges.push({
       kind: 'addPrimaryKey',
-      constraint: { columns: [...columns], name: options?.name },
+      constraint: { columns: [...columns], name },
     })
   }
 
-  dropPrimaryKey(name?: string): void {
+  dropPrimaryKey(name: string): void {
     this.alterChanges.push({ kind: 'dropPrimaryKey', name })
   }
 
-  addUnique(columns: string[], options?: { name?: string }): void {
+  addUnique(name: string, columns: string[]): void {
     this.alterChanges.push({
       kind: 'addUnique',
-      constraint: { columns: [...columns], name: options?.name },
+      constraint: { columns: [...columns], name },
     })
   }
 
@@ -137,10 +138,11 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
   }
 
   addForeignKey(
+    name: string,
     columns: string[],
     refTable: string,
     refColumns?: string[],
-    options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void {
     this.alterChanges.push({
       kind: 'addForeignKey',
@@ -150,7 +152,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
           table: toTableRef(refTable),
           columns: refColumns ? [...refColumns] : ['id'],
         },
-        name: options?.name,
+        name,
         onDelete: options?.onDelete,
         onUpdate: options?.onUpdate,
       },
@@ -261,11 +263,12 @@ export function createSchemaApi(
         cascade: options?.cascade,
       })
     },
-    async createIndex(table, columns, options) {
+    async createIndex(table, name, columns, options) {
       await emit({
         kind: 'createIndex',
         index: {
           table: toTableRef(table),
+          name,
           columns: normalizeIndexColumns(columns),
           ...options,
         },
@@ -287,7 +290,7 @@ export function createSchemaApi(
         to,
       })
     },
-    async addForeignKey(table, columns, refTable, refColumns, options) {
+    async addForeignKey(table, name, columns, refTable, refColumns, options) {
       await emit({
         kind: 'addForeignKey',
         table: toTableRef(table),
@@ -297,7 +300,7 @@ export function createSchemaApi(
             table: toTableRef(refTable),
             columns: refColumns ? [...refColumns] : ['id'],
           },
-          name: options?.name,
+          name,
           onDelete: options?.onDelete,
           onUpdate: options?.onUpdate,
         },

@@ -15,7 +15,6 @@ import type {
 } from '@remix-run/data-table'
 import { getTablePrimaryKey } from '@remix-run/data-table'
 import {
-  defaultIndexName as defaultIndexNameHelper,
   isDataManipulationOperation as isDataManipulationOperationHelper,
   quoteLiteral as quoteLiteralHelper,
   quoteTableRef as quoteTableRefHelper,
@@ -267,6 +266,16 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
  * @param client Mysql pool or connection.
  * @param options Optional adapter capability overrides.
  * @returns A configured mysql adapter.
+ * @example
+ * ```ts
+ * import { createPool } from 'mysql2/promise'
+ * import { createDatabase } from 'remix/data-table'
+ * import { createMysqlDatabaseAdapter } from 'remix/data-table-mysql'
+ *
+ * let pool = createPool({ uri: process.env.DATABASE_URL })
+ * let adapter = createMysqlDatabaseAdapter(pool)
+ * let db = createDatabase(adapter)
+ * ```
  */
 export function createMysqlDatabaseAdapter(
   client: MysqlQueryable,
@@ -391,7 +400,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
 
     if (operation.primaryKey) {
       constraints.push(
-        'primary key (' +
+        'constraint ' +
+          quoteIdentifier(operation.primaryKey.name) +
+          ' primary key (' +
           operation.primaryKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
       )
@@ -399,7 +410,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
 
     for (let unique of operation.uniques ?? []) {
       constraints.push(
-        (unique.name ? 'constraint ' + quoteIdentifier(unique.name) + ' ' : '') +
+        'constraint ' +
+          quoteIdentifier(unique.name) +
+          ' ' +
           'unique (' +
           unique.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
@@ -408,7 +421,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
 
     for (let check of operation.checks ?? []) {
       constraints.push(
-        (check.name ? 'constraint ' + quoteIdentifier(check.name) + ' ' : '') +
+        'constraint ' +
+          quoteIdentifier(check.name) +
+          ' ' +
           'check (' +
           check.expression +
           ')',
@@ -417,7 +432,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
 
     for (let foreignKey of operation.foreignKeys ?? []) {
       let clause =
-        (foreignKey.name ? 'constraint ' + quoteIdentifier(foreignKey.name) + ' ' : '') +
+        'constraint ' +
+        quoteIdentifier(foreignKey.name) +
+        ' ' +
         'foreign key (' +
         foreignKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
         ') references ' +
@@ -483,7 +500,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
       } else if (change.kind === 'addUnique') {
         sql +=
           'add ' +
-          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'unique (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')'
@@ -492,7 +511,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
       } else if (change.kind === 'addForeignKey') {
         sql +=
           'add ' +
-          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'foreign key (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
@@ -505,7 +526,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
       } else if (change.kind === 'addCheck') {
         sql +=
           'add ' +
-          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'check (' +
           change.constraint.expression +
           ')'
@@ -551,7 +574,7 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
           'create ' +
           (operation.index.unique ? 'unique ' : '') +
           'index ' +
-          quoteIdentifier(operation.index.name ?? defaultIndexName(operation.index.columns)) +
+          quoteIdentifier(operation.index.name) +
           ' on ' +
           quoteTableRef(operation.index.table) +
           (operation.index.using ? ' using ' + operation.index.using : '') +
@@ -595,9 +618,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
           'alter table ' +
           quoteTableRef(operation.table) +
           ' add ' +
-          (operation.constraint.name
-            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(operation.constraint.name) +
+          ' ' +
           'foreign key (' +
           operation.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
@@ -632,9 +655,9 @@ function compileMysqlMigrationStatements(operation: DataMigrationOperation): Sql
           'alter table ' +
           quoteTableRef(operation.table) +
           ' add ' +
-          (operation.constraint.name
-            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(operation.constraint.name) +
+          ' ' +
           'check (' +
           operation.constraint.expression +
           ')',
@@ -783,8 +806,4 @@ function compileMysqlColumnType(definition: ColumnDefinition): string {
   }
 
   return 'text'
-}
-
-function defaultIndexName(columns: string[]): string {
-  return defaultIndexNameHelper(columns)
 }

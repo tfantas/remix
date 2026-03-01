@@ -187,14 +187,14 @@ export type IdentityOptions = {
 export type ColumnReference = {
   table: TableRef
   columns: string[]
-  name?: string
+  name: string
   onDelete?: ForeignKeyAction
   onUpdate?: ForeignKeyAction
 }
 
 export type ColumnCheck = {
   expression: string
-  name?: string
+  name: string
 }
 
 export type ColumnDefinition = {
@@ -221,17 +221,17 @@ export type ColumnDefinition = {
 
 export type PrimaryKeyConstraint = {
   columns: string[]
-  name?: string
+  name: string
 }
 
 export type UniqueConstraint = {
   columns: string[]
-  name?: string
+  name: string
 }
 
 export type CheckConstraint = {
   expression: string
-  name?: string
+  name: string
 }
 
 export type ForeignKeyConstraint = {
@@ -240,7 +240,7 @@ export type ForeignKeyConstraint = {
     table: TableRef
     columns: string[]
   }
-  name?: string
+  name: string
   onDelete?: ForeignKeyAction
   onUpdate?: ForeignKeyAction
 }
@@ -249,7 +249,7 @@ export type IndexMethod = 'btree' | 'hash' | 'gin' | 'gist' | 'fulltext' | (stri
 
 export type IndexDefinition = {
   table: TableRef
-  name?: string
+  name: string
   columns: string[]
   unique?: boolean
   where?: string
@@ -299,7 +299,7 @@ export type AddPrimaryKeyChange = {
 
 export type DropPrimaryKeyChange = {
   kind: 'dropPrimaryKey'
-  name?: string
+  name: string
 }
 
 export type AddUniqueChange = {

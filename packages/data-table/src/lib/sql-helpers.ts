@@ -1,7 +1,15 @@
 import type { DataManipulationOperation, DataMigrationOperation, TableRef } from './adapter.ts'
 
+/**
+ * Function used to quote SQL identifiers for a dialect.
+ */
 export type QuoteIdentifier = (value: string) => string
 
+/**
+ * Type guard that narrows an operation to the data-manipulation union.
+ * @param operation Operation to inspect.
+ * @returns `true` when the operation is a data-manipulation operation.
+ */
 export function isDataManipulationOperation(
   operation: DataManipulationOperation | DataMigrationOperation,
 ): operation is DataManipulationOperation {
@@ -18,6 +26,11 @@ export function isDataManipulationOperation(
   )
 }
 
+/**
+ * Normalizes an arbitrary join type string into `inner`, `left`, or `right`.
+ * @param type Input join type.
+ * @returns Normalized join type.
+ */
 export function normalizeJoinType(type: string): string {
   if (type === 'left') {
     return 'left'
@@ -30,6 +43,11 @@ export function normalizeJoinType(type: string): string {
   return 'inner'
 }
 
+/**
+ * Returns stable column order from the union of keys in the provided rows.
+ * @param rows Row objects to scan for keys.
+ * @returns Deduplicated key list in encounter order.
+ */
 export function collectColumns(rows: Record<string, unknown>[]): string[] {
   let columns: string[] = []
   let seen = new Set<string>()
@@ -52,10 +70,14 @@ export function collectColumns(rows: Record<string, unknown>[]): string[] {
   return columns
 }
 
-export function defaultIndexName(columns: string[]): string {
-  return columns.join('_') + '_idx'
-}
-
+/**
+ * Quotes each segment of a dotted identifier path.
+ *
+ * Wildcard segments (`*`) are preserved.
+ * @param path Dotted path to quote.
+ * @param quoteIdentifier Dialect-specific identifier quote function.
+ * @returns Quoted path string.
+ */
 export function quotePath(path: string, quoteIdentifier: QuoteIdentifier): string {
   if (path === '*') {
     return '*'
@@ -73,6 +95,12 @@ export function quotePath(path: string, quoteIdentifier: QuoteIdentifier): strin
     .join('.')
 }
 
+/**
+ * Quotes a `{ schema?, name }` table reference using a dialect quote function.
+ * @param table Table reference to quote.
+ * @param quoteIdentifier Dialect-specific identifier quote function.
+ * @returns Quoted table reference.
+ */
 export function quoteTableRef(table: TableRef, quoteIdentifier: QuoteIdentifier): string {
   if (table.schema) {
     return quoteIdentifier(table.schema) + '.' + quoteIdentifier(table.name)
@@ -81,6 +109,13 @@ export function quoteTableRef(table: TableRef, quoteIdentifier: QuoteIdentifier)
   return quoteIdentifier(table.name)
 }
 
+/**
+ * Converts a JavaScript value into a SQL literal string.
+ * @param value Value to serialize.
+ * @param options Serialization options.
+ * @param options.booleansAsIntegers When `true`, booleans render as `1`/`0`.
+ * @returns SQL literal text.
+ */
 export function quoteLiteral(
   value: unknown,
   options?: {

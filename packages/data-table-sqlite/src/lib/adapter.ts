@@ -15,7 +15,6 @@ import type {
 } from '@remix-run/data-table'
 import { getTablePrimaryKey } from '@remix-run/data-table'
 import {
-  defaultIndexName as defaultIndexNameHelper,
   isDataManipulationOperation as isDataManipulationOperationHelper,
   quoteLiteral as quoteLiteralHelper,
   quoteTableRef as quoteTableRefHelper,
@@ -167,6 +166,16 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
  * @param database Better SQLite3 database instance.
  * @param options Optional adapter capability overrides.
  * @returns A configured sqlite adapter.
+ * @example
+ * ```ts
+ * import BetterSqlite3 from 'better-sqlite3'
+ * import { createDatabase } from 'remix/data-table'
+ * import { createSqliteDatabaseAdapter } from 'remix/data-table-sqlite'
+ *
+ * let sqlite = new BetterSqlite3('./data/app.db')
+ * let adapter = createSqliteDatabaseAdapter(sqlite)
+ * let db = createDatabase(adapter)
+ * ```
  */
 export function createSqliteDatabaseAdapter(
   database: SqliteDatabaseConnection,
@@ -326,7 +335,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
 
     if (operation.primaryKey) {
       constraints.push(
-        'primary key (' +
+        'constraint ' +
+          quoteIdentifier(operation.primaryKey.name) +
+          ' primary key (' +
           operation.primaryKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
       )
@@ -334,7 +345,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
 
     for (let unique of operation.uniques ?? []) {
       constraints.push(
-        (unique.name ? 'constraint ' + quoteIdentifier(unique.name) + ' ' : '') +
+        'constraint ' +
+          quoteIdentifier(unique.name) +
+          ' ' +
           'unique (' +
           unique.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
@@ -343,7 +356,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
 
     for (let check of operation.checks ?? []) {
       constraints.push(
-        (check.name ? 'constraint ' + quoteIdentifier(check.name) + ' ' : '') +
+        'constraint ' +
+          quoteIdentifier(check.name) +
+          ' ' +
           'check (' +
           check.expression +
           ')',
@@ -352,7 +367,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
 
     for (let foreignKey of operation.foreignKeys ?? []) {
       let clause =
-        (foreignKey.name ? 'constraint ' + quoteIdentifier(foreignKey.name) + ' ' : '') +
+        'constraint ' +
+        quoteIdentifier(foreignKey.name) +
+        ' ' +
         'foreign key (' +
         foreignKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
         ') references ' +
@@ -416,7 +433,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
       } else if (change.kind === 'addUnique') {
         sql +=
           'add ' +
-          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'unique (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')'
@@ -425,7 +444,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
       } else if (change.kind === 'addForeignKey') {
         sql +=
           'add ' +
-          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'foreign key (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
@@ -438,7 +459,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
       } else if (change.kind === 'addCheck') {
         sql +=
           'add ' +
-          (change.constraint.name ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' ' : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'check (' +
           change.constraint.expression +
           ')'
@@ -486,7 +509,7 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
           (operation.index.unique ? 'unique ' : '') +
           'index ' +
           (operation.ifNotExists ? 'if not exists ' : '') +
-          quoteIdentifier(operation.index.name ?? defaultIndexName(operation.index.columns)) +
+          quoteIdentifier(operation.index.name) +
           ' on ' +
           quoteTableRef(operation.index.table) +
           ' (' +
@@ -529,9 +552,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
           'alter table ' +
           quoteTableRef(operation.table) +
           ' add ' +
-          (operation.constraint.name
-            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(operation.constraint.name) +
+          ' ' +
           'foreign key (' +
           operation.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
@@ -566,9 +589,9 @@ function compileSqliteMigrationStatements(operation: DataMigrationOperation): Sq
           'alter table ' +
           quoteTableRef(operation.table) +
           ' add ' +
-          (operation.constraint.name
-            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(operation.constraint.name) +
+          ' ' +
           'check (' +
           operation.constraint.expression +
           ')',
@@ -705,8 +728,4 @@ function compileSqliteColumnType(definition: ColumnDefinition): string {
   }
 
   return 'text'
-}
-
-function defaultIndexName(columns: string[]): string {
-  return defaultIndexNameHelper(columns)
 }

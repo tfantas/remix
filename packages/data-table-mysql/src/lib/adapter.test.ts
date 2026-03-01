@@ -713,22 +713,26 @@ describe('mysql adapter', () => {
           references: {
             table: { schema: 'app', name: 'accounts' },
             columns: ['id'],
+            name: 'users_account_inline_fk',
             onDelete: 'set null',
             onUpdate: 'cascade',
           },
         },
         guarded_value: {
           type: 'integer',
-          checks: [{ expression: 'guarded_value > 0' }],
+          checks: [{ expression: 'guarded_value > 0', name: 'users_guarded_value_check' }],
         },
         unknown_type: {
           type: 'mystery' as any,
         },
       },
-      primaryKey: { columns: ['id'] },
-      uniques: [{ columns: ['email'] }, { name: 'users_status_unique', columns: ['status'] }],
+      primaryKey: { name: 'users_pk', columns: ['id'] },
+      uniques: [
+        { name: 'users_email_unique', columns: ['email'] },
+        { name: 'users_status_unique', columns: ['status'] },
+      ],
       checks: [
-        { expression: 'id > 0' },
+        { name: 'users_id_check', expression: 'id > 0' },
         { name: 'users_active_check', expression: 'is_active in (0, 1)' },
       ],
       foreignKeys: [
@@ -804,13 +808,13 @@ describe('mysql adapter', () => {
           definition: {
             type: 'text',
             default: { kind: 'sql', expression: '(concat(first_name, last_name))' },
-            checks: [{ expression: 'char_length(nickname) > 1' }],
+            checks: [{ expression: 'char_length(nickname) > 1', name: 'users_nickname_len_check' }],
           },
         },
         { kind: 'renameColumn', from: 'nickname', to: 'handle' },
         { kind: 'dropColumn', column: 'legacy_handle' },
-        { kind: 'addPrimaryKey', constraint: { columns: ['id'] } },
-        { kind: 'dropPrimaryKey' },
+        { kind: 'addPrimaryKey', constraint: { name: 'users_pk', columns: ['id'] } },
+        { kind: 'dropPrimaryKey', name: 'users_pk' },
         { kind: 'addUnique', constraint: { columns: ['email'], name: 'users_email_unique' } },
         { kind: 'dropUnique', name: 'users_email_unique' },
         {
@@ -858,16 +862,17 @@ describe('mysql adapter', () => {
     assert.match(alterTableStatements[11].text, /drop check `users_email_check`/)
     assert.equal(alterTableStatements[12].text, "alter table `app`.`users` comment = 'owner''s users'")
 
-    let createIndexWithoutName = adapter.compileSql({
+    let createIndexWithName = adapter.compileSql({
       kind: 'createIndex',
       index: {
         table: { name: 'users' },
+        name: 'email_idx',
         columns: ['email'],
       },
     })
 
-    assert.equal(createIndexWithoutName.length, 1)
-    assert.match(createIndexWithoutName[0].text, /create index `email_idx` on `users`/)
+    assert.equal(createIndexWithName.length, 1)
+    assert.match(createIndexWithName[0].text, /create index `email_idx` on `users`/)
   })
 
   it('throws for unsupported data migration operation kinds', () => {

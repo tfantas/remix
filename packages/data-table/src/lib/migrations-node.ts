@@ -5,6 +5,20 @@ import { pathToFileURL } from 'node:url'
 import type { Migration, MigrationDescriptor } from './migrations.ts'
 import { parseMigrationFilename } from './migrations/filename.ts'
 
+/**
+ * Loads migration modules from a directory on Node.js.
+ *
+ * Filenames are used to infer migration `id` and `name`.
+ * Each file must default-export `createMigration(...)`.
+ * @param directory Absolute or relative directory containing migration files.
+ * @returns A sorted list of loaded migration descriptors.
+ * @example
+ * ```ts
+ * import { loadMigrations } from 'remix/data-table/migrations/node'
+ *
+ * let migrations = await loadMigrations('./app/db/migrations')
+ * ```
+ */
 export async function loadMigrations(directory: string): Promise<MigrationDescriptor[]> {
   let allFiles = (await fs.readdir(directory, { withFileTypes: true }))
     .filter((entry) => entry.isFile())

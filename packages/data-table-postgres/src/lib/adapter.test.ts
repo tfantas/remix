@@ -755,12 +755,13 @@ describe('postgres adapter', () => {
         metadata: { type: 'json' },
         blob: { type: 'binary' },
         role: { type: 'enum', enumValues: ['admin', 'user'] },
-        name: { type: 'text', checks: [{ expression: 'length(name) > 1' }] },
+        name: { type: 'text', checks: [{ expression: 'length(name) > 1', name: 'users_name_len_check' }] },
         manager_id: {
           type: 'integer',
           references: {
             table: { schema: 'app', name: 'users' },
             columns: ['id'],
+            name: 'users_manager_fk',
             onDelete: 'set null',
             onUpdate: 'cascade',
           },
@@ -771,7 +772,7 @@ describe('postgres adapter', () => {
         },
         escaped: { type: 'text', default: { kind: 'literal', value: "O'Hare" } },
       },
-      primaryKey: { columns: ['id'] },
+      primaryKey: { name: 'users_pk', columns: ['id'] },
       uniques: [{ name: 'users_email_unique', columns: ['email'] }],
       checks: [{ name: 'users_name_check', expression: 'length(name) > 1' }],
       foreignKeys: [
@@ -844,7 +845,7 @@ describe('postgres adapter', () => {
         { kind: 'renameColumn', from: 'email', to: 'contact_email' },
         { kind: 'dropColumn', column: 'legacy_email', ifExists: true },
         { kind: 'addPrimaryKey', constraint: { name: 'users_pk', columns: ['id'] } },
-        { kind: 'dropPrimaryKey' },
+        { kind: 'dropPrimaryKey', name: 'users_pk' },
         { kind: 'addUnique', constraint: { name: 'users_email_unique', columns: ['contact_email'] } },
         { kind: 'dropUnique', name: 'users_email_unique' },
         {
@@ -877,7 +878,7 @@ describe('postgres adapter', () => {
       alterStatements[4].text,
       'alter table "app"."users" add constraint "users_pk" primary key ("id")',
     )
-    assert.equal(alterStatements[5].text, 'alter table "app"."users" drop constraint "PRIMARY"')
+    assert.equal(alterStatements[5].text, 'alter table "app"."users" drop constraint "users_pk"')
     assert.equal(
       alterStatements[6].text,
       'alter table "app"."users" add constraint "users_email_unique" unique ("contact_email")',
@@ -900,6 +901,7 @@ describe('postgres adapter', () => {
       ifNotExists: true,
       index: {
         table: { name: 'users' },
+        name: 'email_idx',
         columns: ['email'],
         unique: true,
         using: 'gin',

@@ -265,6 +265,20 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
   }
 }
 
+/**
+ * Creates a migration runner for applying/reverting migrations against an adapter.
+ * @param adapter Database adapter used to compile and execute migration operations.
+ * @param migrations Migration descriptors or registry.
+ * @param options Optional runner configuration.
+ * @returns A migration runner instance.
+ * @example
+ * ```ts
+ * import { createMigrationRunner } from 'remix/data-table/migrations'
+ *
+ * let runner = createMigrationRunner(adapter, migrations)
+ * await runner.up()
+ * ```
+ */
 export function createMigrationRunner(
   adapter: DatabaseAdapter,
   migrations: MigrationDescriptor[] | MigrationRegistry,

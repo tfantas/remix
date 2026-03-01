@@ -15,7 +15,6 @@ import type {
 } from '@remix-run/data-table'
 import { getTablePrimaryKey } from '@remix-run/data-table'
 import {
-  defaultIndexName as defaultIndexNameHelper,
   isDataManipulationOperation as isDataManipulationOperationHelper,
   quoteLiteral as quoteLiteralHelper,
   quoteTableRef as quoteTableRefHelper,
@@ -252,6 +251,16 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
  * @param client Postgres pool or client.
  * @param options Optional adapter capability overrides.
  * @returns A configured postgres adapter.
+ * @example
+ * ```ts
+ * import { Pool } from 'pg'
+ * import { createDatabase } from 'remix/data-table'
+ * import { createPostgresDatabaseAdapter } from 'remix/data-table-postgres'
+ *
+ * let pool = new Pool({ connectionString: process.env.DATABASE_URL })
+ * let adapter = createPostgresDatabaseAdapter(pool)
+ * let db = createDatabase(adapter)
+ * ```
  */
 export function createPostgresDatabaseAdapter(
   client: PostgresDatabasePool,
@@ -389,7 +398,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
 
     if (operation.primaryKey) {
       tableConstraints.push(
-        'primary key (' +
+        'constraint ' +
+          quoteIdentifier(operation.primaryKey.name) +
+          ' primary key (' +
           operation.primaryKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
       )
@@ -397,7 +408,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
 
     for (let unique of operation.uniques ?? []) {
       tableConstraints.push(
-        (unique.name ? 'constraint ' + quoteIdentifier(unique.name) + ' ' : '') +
+        'constraint ' +
+          quoteIdentifier(unique.name) +
+          ' ' +
           'unique (' +
           unique.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')',
@@ -406,7 +419,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
 
     for (let check of operation.checks ?? []) {
       tableConstraints.push(
-        (check.name ? 'constraint ' + quoteIdentifier(check.name) + ' ' : '') +
+        'constraint ' +
+          quoteIdentifier(check.name) +
+          ' ' +
           'check (' +
           check.expression +
           ')',
@@ -415,7 +430,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
 
     for (let foreignKey of operation.foreignKeys ?? []) {
       let clause =
-        (foreignKey.name ? 'constraint ' + quoteIdentifier(foreignKey.name) + ' ' : '') +
+        'constraint ' +
+        quoteIdentifier(foreignKey.name) +
+        ' ' +
         'foreign key (' +
         foreignKey.columns.map((column) => quoteIdentifier(column)).join(', ') +
         ') references ' +
@@ -487,20 +504,20 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
       } else if (change.kind === 'addPrimaryKey') {
         sql +=
           'add ' +
-          (change.constraint.name
-            ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'primary key (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')'
       } else if (change.kind === 'dropPrimaryKey') {
-        sql += 'drop constraint ' + quoteIdentifier(change.name ?? 'PRIMARY')
+        sql += 'drop constraint ' + quoteIdentifier(change.name)
       } else if (change.kind === 'addUnique') {
         sql +=
           'add ' +
-          (change.constraint.name
-            ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'unique (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ')'
@@ -509,9 +526,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
       } else if (change.kind === 'addForeignKey') {
         sql +=
           'add ' +
-          (change.constraint.name
-            ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'foreign key (' +
           change.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
@@ -524,9 +541,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
       } else if (change.kind === 'addCheck') {
         sql +=
           'add ' +
-          (change.constraint.name
-            ? 'constraint ' + quoteIdentifier(change.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(change.constraint.name) +
+          ' ' +
           'check (' +
           change.constraint.expression +
           ')'
@@ -586,7 +603,7 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
           (operation.index.unique ? 'unique ' : '') +
           'index ' +
           (operation.ifNotExists ? 'if not exists ' : '') +
-          quoteIdentifier(operation.index.name ?? defaultIndexName(operation.index.columns)) +
+          quoteIdentifier(operation.index.name) +
           ' on ' +
           quoteTableRef(operation.index.table) +
           (operation.index.using ? ' using ' + operation.index.using : '') +
@@ -628,9 +645,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
           'alter table ' +
           quoteTableRef(operation.table) +
           ' add ' +
-          (operation.constraint.name
-            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(operation.constraint.name) +
+          ' ' +
           'foreign key (' +
           operation.constraint.columns.map((column) => quoteIdentifier(column)).join(', ') +
           ') references ' +
@@ -665,9 +682,9 @@ function compilePostgresMigrationStatements(operation: DataMigrationOperation): 
           'alter table ' +
           quoteTableRef(operation.table) +
           ' add ' +
-          (operation.constraint.name
-            ? 'constraint ' + quoteIdentifier(operation.constraint.name) + ' '
-            : '') +
+          'constraint ' +
+          quoteIdentifier(operation.constraint.name) +
+          ' ' +
           'check (' +
           operation.constraint.expression +
           ')',
@@ -819,8 +836,4 @@ function quoteTableRef(table: TableRef): string {
 
 function quoteLiteral(value: unknown): string {
   return quoteLiteralHelper(value)
-}
-
-function defaultIndexName(columns: string[]): string {
-  return defaultIndexNameHelper(columns)
 }

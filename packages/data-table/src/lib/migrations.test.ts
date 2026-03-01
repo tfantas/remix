@@ -183,7 +183,7 @@ describe('migration column builder', () => {
       .notNull()
       .default('hello')
       .unique('users_email_unique')
-      .references('auth.users', ['id'], { name: 'users_auth_fk' })
+      .references('auth.users', ['id'], 'users_auth_fk')
       .onDelete('cascade')
       .onUpdate('restrict')
       .check('length(email) > 3', 'users_email_len')
@@ -288,10 +288,10 @@ describe('migration column builder', () => {
   it('retains existing reference metadata when references() is called again', () => {
     let spec = column
       .integer()
-      .references('auth.accounts', 'id', { name: 'accounts_fk' })
+      .references('auth.accounts', 'id', 'accounts_fk')
       .onDelete('cascade')
       .onUpdate('restrict')
-      .references('auth.users')
+      .references('auth.users', 'accounts_fk')
       .build()
 
     assert.deepEqual(spec.references, {
@@ -577,10 +577,9 @@ describe('migration runner', () => {
           table.addColumn('id', column.integer().primaryKey())
           table.addColumn('email', column.text().notNull())
           table.addColumn('nickname', { type: 'text' })
-          table.addPrimaryKey(['id'], { name: 'accounts_pk' })
-          table.addUnique(['email'], { name: 'accounts_email_uq' })
-          table.addForeignKey(['id'], 'auth.users', ['id'], {
-            name: 'accounts_user_fk',
+          table.addPrimaryKey('accounts_pk', ['id'])
+          table.addUnique('accounts_email_uq', ['email'])
+          table.addForeignKey('accounts_user_fk', ['id'], 'auth.users', ['id'], {
             onDelete: 'cascade',
             onUpdate: 'restrict',
           })
@@ -598,11 +597,11 @@ describe('migration runner', () => {
           table.changeColumn('status', column.varchar(20).notNull())
           table.renameColumn('status', 'account_status')
           table.dropColumn('legacy_status', { ifExists: true })
-          table.addPrimaryKey(['id'], { name: 'accounts_pk_v2' })
+          table.addPrimaryKey('accounts_pk_v2', ['id'])
           table.dropPrimaryKey('accounts_pk_v2')
-          table.addUnique(['account_status'], { name: 'accounts_status_uq' })
+          table.addUnique('accounts_status_uq', ['account_status'])
           table.dropUnique('accounts_status_uq')
-          table.addForeignKey(['id'], 'app.accounts', ['id'], { name: 'accounts_self_fk' })
+          table.addForeignKey('accounts_self_fk', ['id'], 'app.accounts', ['id'])
           table.dropForeignKey('accounts_self_fk')
           table.addCheck('accounts_status_check', "account_status in ('active', 'disabled')")
           table.dropCheck('accounts_status_check')
@@ -613,14 +612,12 @@ describe('migration runner', () => {
 
         await db.renameTable('app.accounts', 'app.accounts_v2')
         await db.dropTable('app.accounts_v2', { ifExists: true, cascade: true })
-        await db.createIndex('app.accounts', ['id', 'email'], {
-          name: 'accounts_compound_idx',
+        await db.createIndex('app.accounts', 'accounts_compound_idx', ['id', 'email'], {
           unique: true,
         })
         await db.dropIndex('app.accounts', 'accounts_compound_idx', { ifExists: true })
         await db.renameIndex('app.accounts', 'accounts_old_idx', 'accounts_new_idx')
-        await db.addForeignKey('app.accounts', ['id'], 'auth.users', undefined, {
-          name: 'accounts_fk_global',
+        await db.addForeignKey('app.accounts', 'accounts_fk_global', ['id'], 'auth.users', undefined, {
           onDelete: 'cascade',
           onUpdate: 'restrict',
         })

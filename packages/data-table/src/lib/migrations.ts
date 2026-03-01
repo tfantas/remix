@@ -6,27 +6,63 @@ import type {
 } from './adapter.ts'
 import type { ColumnBuilder } from './migrations/column-builder.ts'
 
+/**
+ * Controls how each migration is wrapped in transactions.
+ */
 export type MigrationTransactionMode = 'auto' | 'required' | 'none'
 
+/**
+ * Database API available inside migrations.
+ */
 export type MigrationDatabase = Database & MigrationOperations
 
+/**
+ * Runtime context passed to migration `up`/`down` handlers.
+ */
 export type MigrationContext = {
   dialect: string
   db: MigrationDatabase
 }
 
+/**
+ * Authoring shape for `createMigration(...)`.
+ */
 export type CreateMigrationInput = {
   up: (context: MigrationContext) => Promise<void> | void
   down: (context: MigrationContext) => Promise<void> | void
   transaction?: MigrationTransactionMode
 }
 
+/**
+ * Normalized migration object consumed by the registry/runner.
+ */
 export type Migration = {
   up: CreateMigrationInput['up']
   down: CreateMigrationInput['down']
   transaction: MigrationTransactionMode
 }
 
+/**
+ * Creates a migration descriptor with normalized defaults.
+ * @param input Migration handlers and transaction mode.
+ * @returns A normalized migration object.
+ * @example
+ * ```ts
+ * import { createMigration, column as c } from 'remix/data-table/migrations'
+ *
+ * export default createMigration({
+ *   async up({ db }) {
+ *     await db.createTable('users', (table) => {
+ *       table.addColumn('id', c.integer().primaryKey().autoIncrement())
+ *       table.addColumn('email', c.varchar(255).notNull().unique())
+ *     })
+ *   },
+ *   async down({ db }) {
+ *     await db.dropTable('users', { ifExists: true })
+ *   },
+ * })
+ * ```
+ */
 export function createMigration(input: CreateMigrationInput): Migration {
   return {
     up: input.up,
@@ -35,6 +71,9 @@ export function createMigration(input: CreateMigrationInput): Migration {
   }
 }
 
+/**
+ * Migration metadata stored in registries and returned by loaders.
+ */
 export type MigrationDescriptor = {
   id: string
   name: string
@@ -43,8 +82,14 @@ export type MigrationDescriptor = {
   migration: Migration
 }
 
+/**
+ * Direction used by migration runner operations.
+ */
 export type MigrationDirection = 'up' | 'down'
 
+/**
+ * Row shape persisted in the migration journal table.
+ */
 export type MigrationJournalRow = {
   id: string
   name: string
@@ -53,8 +98,14 @@ export type MigrationJournalRow = {
   appliedAt: Date
 }
 
+/**
+ * Effective status for a known migration.
+ */
 export type MigrationStatus = 'applied' | 'pending' | 'drifted'
 
+/**
+ * Status row returned by `runner.status()` and `runner.up/down(...)`.
+ */
 export type MigrationStatusEntry = {
   id: string
   name: string
@@ -64,23 +115,44 @@ export type MigrationStatusEntry = {
   checksum?: string
 }
 
+/**
+ * Common options for `runner.up(...)` and `runner.down(...)`.
+ */
 export type MigrateOptions = {
   to?: string
   step?: number
   dryRun?: boolean
 }
 
+/**
+ * Result shape returned by migration runner commands.
+ */
 export type MigrateResult = {
   applied: MigrationStatusEntry[]
   reverted: MigrationStatusEntry[]
   sql: Array<{ text: string; values: unknown[] }>
 }
 
+/**
+ * Options for `db.createTable(...)` migration operations.
+ */
 export type CreateTableOptions = { ifNotExists?: boolean }
+/**
+ * Options for `db.alterTable(...)` migration operations.
+ */
 export type AlterTableOptions = { ifExists?: boolean }
+/**
+ * Options for `db.dropTable(...)` migration operations.
+ */
 export type DropTableOptions = { ifExists?: boolean; cascade?: boolean }
+/**
+ * Accepts either one index column or multiple (compound index).
+ */
 export type IndexColumns = string | string[]
 
+/**
+ * Chainable column-constructor namespace exposed as `column`.
+ */
 export type ColumnNamespace = {
   varchar(length: number): ColumnBuilder
   text(): ColumnBuilder
@@ -97,15 +169,19 @@ export type ColumnNamespace = {
   enum(values: readonly string[]): ColumnBuilder
 }
 
+/**
+ * Builder API available inside `db.createTable(name, table => ...)`.
+ */
 export interface CreateTableBuilder {
   addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
-  addPrimaryKey(columns: string[], options?: { name?: string }): void
-  addUnique(columns: string[], options?: { name?: string }): void
+  addPrimaryKey(name: string, columns: string[]): void
+  addUnique(name: string, columns: string[]): void
   addForeignKey(
+    name: string,
     columns: string[],
     refTable: string,
     refColumns?: string[],
-    options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
   addCheck(name: string, expression: string): void
   addIndex(
@@ -116,20 +192,24 @@ export interface CreateTableBuilder {
   comment(text: string): void
 }
 
+/**
+ * Builder API available inside `db.alterTable(name, table => ...)`.
+ */
 export interface AlterTableBuilder {
   addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
   changeColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
   renameColumn(from: string, to: string): void
   dropColumn(name: string, options?: { ifExists?: boolean }): void
-  addPrimaryKey(columns: string[], options?: { name?: string }): void
-  dropPrimaryKey(name?: string): void
-  addUnique(columns: string[], options?: { name?: string }): void
+  addPrimaryKey(name: string, columns: string[]): void
+  dropPrimaryKey(name: string): void
+  addUnique(name: string, columns: string[]): void
   dropUnique(name: string): void
   addForeignKey(
+    name: string,
     columns: string[],
     refTable: string,
     refColumns?: string[],
-    options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): void
   dropForeignKey(name: string): void
   addCheck(name: string, expression: string): void
@@ -143,6 +223,9 @@ export interface AlterTableBuilder {
   comment(text: string): void
 }
 
+/**
+ * DDL-focused operations mixed into the migration `db` object.
+ */
 export interface MigrationOperations {
   createTable(
     name: string,
@@ -158,17 +241,19 @@ export interface MigrationOperations {
   dropTable(name: string, options?: DropTableOptions): Promise<void>
   createIndex(
     table: string,
+    name: string,
     columns: IndexColumns,
-    options?: Omit<IndexDefinition, 'table' | 'columns'>,
+    options?: Omit<IndexDefinition, 'table' | 'name' | 'columns'>,
   ): Promise<void>
   dropIndex(table: string, name: string, options?: { ifExists?: boolean }): Promise<void>
   renameIndex(table: string, from: string, to: string): Promise<void>
   addForeignKey(
     table: string,
+    name: string,
     columns: string[],
     refTable: string,
     refColumns?: string[],
-    options?: { name?: string; onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
+    options?: { onDelete?: ForeignKeyAction; onUpdate?: ForeignKeyAction },
   ): Promise<void>
   dropForeignKey(table: string, name: string): Promise<void>
   addCheck(table: string, name: string, expression: string): Promise<void>
@@ -178,15 +263,24 @@ export interface MigrationOperations {
   columnExists(table: string, column: string): Promise<boolean>
 }
 
+/**
+ * Runtime-agnostic migration registry abstraction.
+ */
 export type MigrationRegistry = {
   register(migration: MigrationDescriptor): void
   list(): MigrationDescriptor[]
 }
 
+/**
+ * Options for creating a migration runner.
+ */
 export type MigrationRunnerOptions = {
   tableName?: string
 }
 
+/**
+ * Migration runner API for applying, reverting, and inspecting migration state.
+ */
 export type MigrationRunner = {
   up(options?: MigrateOptions): Promise<MigrateResult>
   down(options?: MigrateOptions): Promise<MigrateResult>

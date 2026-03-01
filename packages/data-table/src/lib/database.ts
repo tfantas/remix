@@ -295,6 +295,11 @@ export type CreateManyRowsOptions = {
   returnRows: true
 }
 
+/**
+ * High-level database runtime used to build and execute data manipulation operations.
+ *
+ * Create instances with {@link createDatabase}.
+ */
 export type Database = {
   adapter: DatabaseAdapter
   now(): unknown
@@ -794,6 +799,22 @@ class DatabaseRuntime implements Database {
  * @param options Optional runtime options.
  * @param options.now Clock function used for auto-managed timestamps.
  * @returns A `Database` API instance.
+ * @example
+ * ```ts
+ * import { createDatabase, table } from 'remix/data-table'
+ * import { number, string } from 'remix/data-schema'
+ *
+ * let users = table({
+ *   name: 'users',
+ *   columns: {
+ *     id: number(),
+ *     email: string(),
+ *   },
+ * })
+ *
+ * let db = createDatabase(adapter)
+ * let rows = await db.query(users).where({ id: 1 }).all()
+ * ```
  */
 export function createDatabase(
   adapter: DatabaseAdapter,

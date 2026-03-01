@@ -409,22 +409,26 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
           references: {
             table: { schema: 'app', name: 'accounts' },
             columns: ['id'],
+            name: 'users_account_inline_fk',
             onDelete: 'set null',
             onUpdate: 'cascade',
           },
         },
         guarded_value: {
           type: 'integer',
-          checks: [{ expression: 'guarded_value > 0' }],
+          checks: [{ expression: 'guarded_value > 0', name: 'users_guarded_value_check' }],
         },
         unknown_type: {
           type: 'mystery' as any,
         },
       },
-      primaryKey: { columns: ['id'] },
-      uniques: [{ columns: ['email'] }, { name: 'users_email_unique', columns: ['email'] }],
+      primaryKey: { name: 'users_pk', columns: ['id'] },
+      uniques: [
+        { name: 'users_inline_email_unique', columns: ['email'] },
+        { name: 'users_email_unique', columns: ['email'] },
+      ],
       checks: [
-        { expression: 'id > 0' },
+        { name: 'users_id_check', expression: 'id > 0' },
         { name: 'users_active_check', expression: 'is_active in (0, 1)' },
       ],
       foreignKeys: [
@@ -490,8 +494,8 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
         { kind: 'changeColumn', column: 'nickname', definition: { type: 'text' } },
         { kind: 'renameColumn', from: 'nickname', to: 'handle' },
         { kind: 'dropColumn', column: 'legacy_handle' },
-        { kind: 'addPrimaryKey', constraint: { columns: ['id'] } },
-        { kind: 'dropPrimaryKey' },
+        { kind: 'addPrimaryKey', constraint: { name: 'users_pk', columns: ['id'] } },
+        { kind: 'dropPrimaryKey', name: 'users_pk' },
         { kind: 'addUnique', constraint: { columns: ['email'], name: 'users_email_unique' } },
         { kind: 'dropUnique', name: 'users_email_unique' },
         {
@@ -535,16 +539,17 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
     )
     assert.match(alterTableStatements[11].text, /drop constraint "users_email_check"/)
 
-    let createIndexWithoutName = adapter.compileSql({
+    let createIndexWithName = adapter.compileSql({
       kind: 'createIndex',
       index: {
         table: { name: 'users' },
+        name: 'email_idx',
         columns: ['email'],
       },
     })
 
-    assert.equal(createIndexWithoutName.length, 1)
-    assert.match(createIndexWithoutName[0].text, /create index "email_idx" on "users"/)
+    assert.equal(createIndexWithName.length, 1)
+    assert.match(createIndexWithName[0].text, /create index "email_idx" on "users"/)
   })
 
   it('throws for unsupported data migration operation kinds', () => {
