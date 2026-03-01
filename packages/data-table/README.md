@@ -225,10 +225,10 @@ Return behavior:
 - `updateMany`/`deleteMany` -> `WriteResult`
 - `delete` -> `boolean`
 
-### Data Validation
+### Validation and Lifecycle
 
-Validation is optional and table-scoped. Define `validate(context)` on a table to validate and/or
-coerce incoming write payloads.
+Validation is optional and table-scoped. Define `validate(context)` to validate/coerce write
+payloads, and add lifecycle callbacks when you need custom read/write/delete behavior.
 
 ```ts
 import { column as c, table } from 'remix/data-table'
@@ -238,6 +238,14 @@ let payments = table({
   columns: {
     id: c.uuid(),
     amount: c.decimal(10, 2),
+  },
+  beforeWrite({ value }) {
+    return {
+      value: {
+        ...value,
+        amount: typeof value.amount === 'string' ? value.amount.trim() : value.amount,
+      },
+    }
   },
   validate({ operation, value }) {
     if (operation === 'create' && typeof value.amount === 'string') {
@@ -252,16 +260,38 @@ let payments = table({
 
     return { value }
   },
+  beforeDelete({ where }) {
+    if (where.length === 0) {
+      return { issues: [{ message: 'Refusing unscoped delete' }] }
+    }
+  },
+  afterRead({ value }) {
+    return {
+      value: {
+        ...value,
+        // Example read-time shaping
+        amount: typeof value.amount === 'number' ? Math.round(value.amount * 100) / 100 : value.amount,
+      },
+    }
+  },
 })
 ```
 
 Validation semantics:
 
+- `beforeWrite` runs before `validate` for writes
 - `validate` runs for writes (`create`, `createMany`, `insert`, `insertMany`, `update`, `updateMany`, `upsert`)
 - Hook context includes `{ operation: 'create' | 'update', tableName, value }`
 - Payloads are partial objects
 - Unknown columns fail validation before and after hook processing
+- Timestamp touch/default handling runs after `beforeWrite` and `validate`
+- `afterWrite` runs after successful write execution
+- `beforeDelete` can veto deletes by returning `{ issues }`
+- `afterDelete` runs after successful deletes with `affectedRows`
+- `afterRead` runs for each loaded row (root rows, eager-loaded relation rows, and write-returning rows)
 - Predicate values (`where`, `having`, join predicates) are not runtime-validated
+- Lifecycle callbacks are synchronous; returning a Promise throws a validation error
+- Callbacks do not introduce implicit transactions (use `db.transaction(...)` when you need rollback guarantees)
 
 ## Transactions
 

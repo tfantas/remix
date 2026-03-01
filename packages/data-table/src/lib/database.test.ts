@@ -1143,6 +1143,305 @@ describe('writes and validation', () => {
     )
   })
 
+  it('runs beforeWrite -> validate -> touch -> afterWrite for create', async () => {
+    let callbackOrder: string[] = []
+    let validateSawTouchedColumn = false
+    let writeTrackedAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+        ...timestamps(),
+      },
+      timestamps: true,
+      beforeWrite({ value }) {
+        callbackOrder.push('beforeWrite')
+        return {
+          value: {
+            ...value,
+            status: String(value.status).toUpperCase(),
+          },
+        }
+      },
+      validate({ value }) {
+        callbackOrder.push('validate')
+        validateSawTouchedColumn = Object.prototype.hasOwnProperty.call(value, 'created_at')
+        return { value }
+      },
+      afterWrite({ values }) {
+        callbackOrder.push('afterWrite')
+        let payload = values[0] as Record<string, unknown>
+        assert.equal(payload.status, 'ACTIVE')
+        assert.equal(payload.created_at, '2026-01-01T00:00:00.000Z')
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await db.create(writeTrackedAccounts, {
+      id: 1,
+      email: 'ops@studio.test',
+      status: 'active',
+    })
+
+    let saved = await db.find(writeTrackedAccounts, 1)
+    assert.ok(saved)
+    assert.equal(saved.status, 'ACTIVE')
+    assert.equal(saved.created_at, '2026-01-01T00:00:00.000Z')
+    assert.equal(validateSawTouchedColumn, false)
+    assert.deepEqual(callbackOrder, ['beforeWrite', 'validate', 'afterWrite'])
+  })
+
+  it('passes scoped delete context to callbacks and reports affected rows', async () => {
+    let beforeDeleteCalls: Array<{
+      tableName: string
+      whereLength: number
+      orderByColumn?: string
+      orderByDirection?: string
+      limit?: number
+    }> = []
+    let afterDeleteAffectedRows: number[] = []
+    let deleteTrackedAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      beforeDelete(context) {
+        beforeDeleteCalls.push({
+          tableName: context.tableName,
+          whereLength: context.where.length,
+          orderByColumn: context.orderBy[0]?.column,
+          orderByDirection: context.orderBy[0]?.direction,
+          limit: context.limit,
+        })
+      },
+      afterDelete(context) {
+        afterDeleteAffectedRows.push(context.affectedRows)
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [
+        { id: 1, email: 'amy@studio.test', status: 'active' },
+        { id: 2, email: 'brad@studio.test', status: 'active' },
+        { id: 3, email: 'cara@studio.test', status: 'inactive' },
+      ],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    let result = await db
+      .query(deleteTrackedAccounts)
+      .where({ status: 'active' })
+      .orderBy('id', 'asc')
+      .limit(1)
+      .delete()
+
+    assert.equal(result.affectedRows, 1)
+    assert.deepEqual(beforeDeleteCalls, [
+      {
+        tableName: 'accounts',
+        whereLength: 1,
+        orderByColumn: 'id',
+        orderByDirection: 'asc',
+        limit: 1,
+      },
+    ])
+    assert.deepEqual(afterDeleteAffectedRows, [1])
+  })
+
+  it('allows beforeDelete to veto deletes with issues', async () => {
+    let vetoedAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      beforeDelete() {
+        return {
+          issues: [{ message: 'Deletes are disabled' }],
+        }
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'amy@studio.test', status: 'active' }],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await assert.rejects(
+      async () => {
+        await db.query(vetoedAccounts).where({ id: 1 }).delete()
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Invalid value for table "accounts"' &&
+        error.metadata?.operation === 'delete',
+    )
+  })
+
+  it('applies afterRead to root rows, related rows, and write-returning rows', async () => {
+    let readableAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      afterRead({ value }) {
+        return {
+          value: {
+            ...value,
+            email: typeof value.email === 'string' ? value.email.toUpperCase() : value.email,
+          },
+        }
+      },
+    })
+    let readableProjects = table({
+      name: 'projects',
+      columns: {
+        id: column.integer(),
+        account_id: column.integer(),
+        name: column.text(),
+        archived: column.boolean(),
+      },
+      afterRead({ value }) {
+        return {
+          value: {
+            ...value,
+            name: typeof value.name === 'string' ? value.name + '!' : value.name,
+          },
+        }
+      },
+    })
+    let readableAccountProjects = hasMany(readableAccounts, readableProjects)
+
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'amy@studio.test', status: 'active' }],
+      projects: [{ id: 100, account_id: 1, name: 'Spring Campaign', archived: false }],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    let rows = await db.query(readableAccounts).with({ projects: readableAccountProjects }).all()
+    assert.equal(rows[0].email, 'AMY@STUDIO.TEST')
+    assert.equal(rows[0].projects[0].name, 'Spring Campaign!')
+
+    let insertResult = await db.query(readableAccounts).insert(
+      { id: 2, email: 'new@studio.test', status: 'active' },
+      { returning: '*' },
+    )
+
+    if ('row' in insertResult && insertResult.row) {
+      assert.equal(insertResult.row.email, 'NEW@STUDIO.TEST')
+    } else {
+      assert.fail('Expected row in insert result')
+    }
+  })
+
+  it('enforces synchronous lifecycle callbacks', async () => {
+    let asyncBeforeWriteAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      beforeWrite({ value }) {
+        return Promise.resolve({ value }) as never
+      },
+    })
+    let asyncAfterReadAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      afterRead({ value }) {
+        return Promise.resolve({ value }) as never
+      },
+    })
+
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'amy@studio.test', status: 'active' }],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await assert.rejects(
+      async () => {
+        await db.create(asyncBeforeWriteAccounts, { id: 2, email: 'new@studio.test' })
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Invalid beforeWrite callback result for table "accounts"',
+    )
+
+    await assert.rejects(
+      async () => {
+        await db.find(asyncAfterReadAccounts, 1)
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Invalid afterRead callback result for table "accounts"',
+    )
+  })
+
+  it('throws for invalid beforeDelete callback return values', async () => {
+    let invalidBeforeDeleteAccounts = table({
+      name: 'accounts',
+      columns: {
+        id: column.integer(),
+        email: column.text(),
+        status: column.text(),
+      },
+      beforeDelete() {
+        return { value: { allowed: false } } as never
+      },
+    })
+    let adapter = createAdapter({
+      accounts: [{ id: 1, email: 'amy@studio.test', status: 'active' }],
+      projects: [],
+      profiles: [],
+      tasks: [],
+      memberships: [],
+    })
+    let db = createTestDatabase(adapter)
+
+    await assert.rejects(
+      async () => {
+        await db.query(invalidBeforeDeleteAccounts).where({ id: 1 }).delete()
+      },
+      (error: unknown) =>
+        error instanceof DataTableValidationError &&
+        error.message === 'Invalid beforeDelete callback result for table "accounts"',
+    )
+  })
+
   it('throws for update returning when adapter has no RETURNING support', async () => {
     let adapter = createAdapter(
       {

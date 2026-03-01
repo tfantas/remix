@@ -26,21 +26,30 @@ import type {
   OrderDirection,
   PrimaryKeyInput,
   Relation,
+  TableAfterDeleteContext,
+  TableAfterWriteContext,
+  TableBeforeDeleteContext,
+  TableLifecycleOperation,
   TableName,
   TablePrimaryKey,
   TableRow,
   TableRowWith,
+  TableWriteOperation,
   TableValidate,
-  TableValidationOperation,
   TimestampConfig,
   ValidationIssue,
   tableMetadataKey,
 } from './table.ts'
 import {
   getCompositeKey,
+  getTableAfterDelete,
+  getTableAfterRead,
+  getTableAfterWrite,
+  getTableBeforeDelete,
   getPrimaryKeyObject,
   getTableColumns,
   getTableName,
+  getTableBeforeWrite,
   getTablePrimaryKey,
   getTableTimestamps,
   getTableValidator,
@@ -128,6 +137,7 @@ type SavepointCounter = {
 }
 
 const executeOperation = Symbol('executeOperation')
+const loadRowsWithRelations = Symbol('loadRowsWithRelations')
 
 type RelationMapForSourceName<tableName extends string> = Record<
   string,
@@ -1112,21 +1122,24 @@ export class QueryBuilder<
    * @returns All matching rows with requested eager-loaded relations.
    */
   async all(): Promise<Array<row & loaded>> {
+    let rows = await this[loadRowsWithRelations]()
+    return applyAfterReadHooksToLoadedRows(
+      this.#table,
+      rows,
+      this.#state.with,
+    ) as Array<row & loaded>
+  }
+
+  async [loadRowsWithRelations](): Promise<Record<string, unknown>[]> {
     let operation = this.#toSelectOperation()
     let result = await this.#database[executeOperation](operation)
     let rows = normalizeRows(result.rows)
 
     if (Object.keys(this.#state.with).length === 0) {
-      return rows as Array<row & loaded>
+      return rows
     }
 
-    let rowsWithRelations = await loadRelationsForRows(
-      this.#database,
-      this.#table,
-      rows,
-      this.#state.with,
-    )
-    return rowsWithRelations as Array<row & loaded>
+    return loadRelationsForRows(this.#database, this.#table, rows, this.#state.with)
   }
 
   /**
@@ -1240,10 +1253,20 @@ export class QueryBuilder<
       }
 
       let result = await this.#database[executeOperation](operation)
-      let row = (normalizeRows(result.rows)[0] ?? null) as row | null
+      let row = (applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows))[0] ?? null) as
+        | row
+        | null
+      let affectedRows = result.affectedRows ?? 0
+      runAfterWriteHook(this.#table, {
+        operation: 'create',
+        tableName: getTableName(this.#table),
+        values: [preparedValues as Partial<row>],
+        affectedRows,
+        insertId: result.insertId,
+      })
 
       return {
-        affectedRows: result.affectedRows ?? 0,
+        affectedRows,
         insertId: result.insertId,
         row,
       }
@@ -1256,8 +1279,16 @@ export class QueryBuilder<
     }
 
     let result = await this.#database[executeOperation](operation)
+    let affectedRows = result.affectedRows ?? 0
+    runAfterWriteHook(this.#table, {
+      operation: 'create',
+      tableName: getTableName(this.#table),
+      values: [preparedValues as Partial<row>],
+      affectedRows,
+      insertId: result.insertId,
+    })
     let metadata: WriteResult = {
-      affectedRows: result.affectedRows ?? 0,
+      affectedRows,
       insertId: result.insertId,
     }
 
@@ -1309,11 +1340,19 @@ export class QueryBuilder<
       }
 
       let result = await this.#database[executeOperation](operation)
+      let affectedRows = result.affectedRows ?? 0
+      runAfterWriteHook(this.#table, {
+        operation: 'create',
+        tableName: getTableName(this.#table),
+        values: preparedValues as Array<Partial<row>>,
+        affectedRows,
+        insertId: result.insertId,
+      })
 
       return {
-        affectedRows: result.affectedRows ?? 0,
+        affectedRows,
         insertId: result.insertId,
-        rows: normalizeRows(result.rows) as row[],
+        rows: applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows)) as row[],
       }
     }
 
@@ -1324,8 +1363,16 @@ export class QueryBuilder<
     }
 
     let result = await this.#database[executeOperation](operation)
+    let affectedRows = result.affectedRows ?? 0
+    runAfterWriteHook(this.#table, {
+      operation: 'create',
+      tableName: getTableName(this.#table),
+      values: preparedValues as Array<Partial<row>>,
+      affectedRows,
+      insertId: result.insertId,
+    })
     let metadata: WriteResult = {
-      affectedRows: result.affectedRows ?? 0,
+      affectedRows,
       insertId: result.insertId,
     }
 
@@ -1351,67 +1398,78 @@ export class QueryBuilder<
       offset: true,
     })
 
+    let returning = options?.returning
+    assertReturningCapability(this.#database.adapter, 'update', returning)
     let preparedChanges = prepareUpdateValues(
       this.#table,
       changes,
       this.#database.now(),
       options?.touch ?? true,
     )
-    let returning = options?.returning
-    assertReturningCapability(this.#database.adapter, 'update', returning)
 
     if (Object.keys(preparedChanges).length === 0) {
       throw new DataTableQueryError('update() requires at least one change')
     }
 
+    let result: DataManipulationResult
+
     if (hasScopedWriteModifiers(this.#state)) {
       let table = this.#table
       let queryState = this.#state
 
-      return this.#database.transaction(async (tx: Database) => {
+      result = await this.#database.transaction(async (tx: Database) => {
         let primaryKeys = await loadPrimaryKeyRowsForScope(tx, table, queryState)
         let primaryKeyPredicate = buildPrimaryKeyPredicate(table, primaryKeys)
 
         if (!primaryKeyPredicate) {
-          if (!returning) {
-            return {
-              affectedRows: 0,
-              insertId: undefined,
-            }
-          }
-
           return {
             affectedRows: 0,
             insertId: undefined,
-            rows: [],
+            rows: returning ? [] : undefined,
           }
         }
 
-        return tx.query(table).where(primaryKeyPredicate).update(changes, options)
+        let txRuntime = tx as unknown as DatabaseRuntime
+        return txRuntime[executeOperation]({
+          kind: 'update',
+          table,
+          changes: preparedChanges,
+          where: [primaryKeyPredicate],
+          returning: returning ? normalizeReturningSelection(returning) : undefined,
+        })
       })
+    } else {
+      let operation: UpdateOperation<AnyTable> = {
+        kind: 'update',
+        table: this.#table,
+        changes: preparedChanges,
+        where: [...this.#state.where],
+        returning: returning ? normalizeReturningSelection(returning) : undefined,
+      }
+
+      result = await this.#database[executeOperation](operation)
     }
 
-    let operation: UpdateOperation<AnyTable> = {
-      kind: 'update',
-      table: this.#table,
-      changes: preparedChanges,
-      where: [...this.#state.where],
-      returning: returning ? normalizeReturningSelection(returning) : undefined,
-    }
-
-    let result = await this.#database[executeOperation](operation)
+    let affectedRows = result.affectedRows ?? 0
+    runAfterWriteHook(this.#table, {
+      operation: 'update',
+      tableName: getTableName(this.#table),
+      values: [preparedChanges as Partial<row>],
+      affectedRows,
+      insertId: result.insertId,
+    })
 
     if (!returning) {
       return {
-        affectedRows: result.affectedRows ?? 0,
+        affectedRows,
         insertId: result.insertId,
       }
     }
 
     return {
-      affectedRows: result.affectedRows ?? 0,
+      affectedRows,
       insertId: result.insertId,
-      rows: normalizeRows(result.rows) as row[],
+      rows: applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows)) as row[],
     }
   }
 
@@ -1433,54 +1491,74 @@ export class QueryBuilder<
 
     let returning = options?.returning
     assertReturningCapability(this.#database.adapter, 'delete', returning)
+    let tableName = getTableName(this.#table)
+    let deleteContext: TableBeforeDeleteContext = {
+      tableName,
+      where: [...this.#state.where],
+      orderBy: [...this.#state.orderBy],
+      limit: this.#state.limit,
+      offset: this.#state.offset,
+    }
+
+    runBeforeDeleteHook(this.#table, deleteContext)
+    let result: DataManipulationResult
 
     if (hasScopedWriteModifiers(this.#state)) {
       let table = this.#table
       let queryState = this.#state
 
-      return this.#database.transaction(async (tx: Database) => {
+      result = await this.#database.transaction(async (tx: Database) => {
         let primaryKeys = await loadPrimaryKeyRowsForScope(tx, table, queryState)
         let primaryKeyPredicate = buildPrimaryKeyPredicate(table, primaryKeys)
 
         if (!primaryKeyPredicate) {
-          if (!returning) {
-            return {
-              affectedRows: 0,
-              insertId: undefined,
-            }
-          }
-
           return {
             affectedRows: 0,
             insertId: undefined,
-            rows: [],
+            rows: returning ? [] : undefined,
           }
         }
 
-        return tx.query(table).where(primaryKeyPredicate).delete(options)
+        let txRuntime = tx as unknown as DatabaseRuntime
+        return txRuntime[executeOperation]({
+          kind: 'delete',
+          table,
+          where: [primaryKeyPredicate],
+          returning: returning ? normalizeReturningSelection(returning) : undefined,
+        })
       })
+    } else {
+      let operation: DeleteOperation<AnyTable> = {
+        kind: 'delete',
+        table: this.#table,
+        where: [...this.#state.where],
+        returning: returning ? normalizeReturningSelection(returning) : undefined,
+      }
+
+      result = await this.#database[executeOperation](operation)
     }
 
-    let operation: DeleteOperation<AnyTable> = {
-      kind: 'delete',
-      table: this.#table,
-      where: [...this.#state.where],
-      returning: returning ? normalizeReturningSelection(returning) : undefined,
-    }
-
-    let result = await this.#database[executeOperation](operation)
+    let affectedRows = result.affectedRows ?? 0
+    runAfterDeleteHook(this.#table, {
+      tableName,
+      where: deleteContext.where,
+      orderBy: deleteContext.orderBy,
+      limit: deleteContext.limit,
+      offset: deleteContext.offset,
+      affectedRows,
+    })
 
     if (!returning) {
       return {
-        affectedRows: result.affectedRows ?? 0,
+        affectedRows,
         insertId: result.insertId,
       }
     }
 
     return {
-      affectedRows: result.affectedRows ?? 0,
+      affectedRows,
       insertId: result.insertId,
-      rows: normalizeRows(result.rows) as row[],
+      rows: applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows)) as row[],
     }
   }
 
@@ -1543,10 +1621,23 @@ export class QueryBuilder<
       }
 
       let result = await this.#database[executeOperation](operation)
-      let row = (normalizeRows(result.rows)[0] ?? null) as row | null
+      let row = (applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows))[0] ?? null) as
+        | row
+        | null
+      let affectedRows = result.affectedRows ?? 0
+      let preparedWriteValues = updateChanges
+        ? ([preparedValues, updateChanges] as Array<Partial<row>>)
+        : ([preparedValues] as Array<Partial<row>>)
+      runAfterWriteHook(this.#table, {
+        operation: 'create',
+        tableName: getTableName(this.#table),
+        values: preparedWriteValues,
+        affectedRows,
+        insertId: result.insertId,
+      })
 
       return {
-        affectedRows: result.affectedRows ?? 0,
+        affectedRows,
         insertId: result.insertId,
         row,
       }
@@ -1561,8 +1652,19 @@ export class QueryBuilder<
     }
 
     let result = await this.#database[executeOperation](operation)
+    let affectedRows = result.affectedRows ?? 0
+    let preparedWriteValues = updateChanges
+      ? ([preparedValues, updateChanges] as Array<Partial<row>>)
+      : ([preparedValues] as Array<Partial<row>>)
+    runAfterWriteHook(this.#table, {
+      operation: 'create',
+      tableName: getTableName(this.#table),
+      values: preparedWriteValues,
+      affectedRows,
+      insertId: result.insertId,
+    })
     let metadata: WriteResult = {
-      affectedRows: result.affectedRows ?? 0,
+      affectedRows,
       insertId: result.insertId,
     }
 
@@ -1676,7 +1778,7 @@ async function loadDirectRelationValues(
     includePagination: false,
   })
 
-  let relatedRows = (await query.all()) as unknown as Record<string, unknown>[]
+  let relatedRows = await query[loadRowsWithRelations]()
   let grouped = groupRowsByTuple(relatedRows, relation.targetKey)
 
   return sourceRows.map((sourceRow) => {
@@ -1725,7 +1827,7 @@ async function loadHasManyThroughValues(
     includePagination: false,
   })
 
-  let throughRows = (await throughQuery.all()) as unknown as Record<string, unknown>[]
+  let throughRows = await throughQuery[loadRowsWithRelations]()
 
   if (throughRows.length === 0) {
     return sourceRows.map(() => [])
@@ -1767,7 +1869,7 @@ async function loadHasManyThroughValues(
     includePagination: false,
   })
 
-  let relatedRows = (await targetQuery.all()) as unknown as Record<string, unknown>[]
+  let relatedRows = await targetQuery[loadRowsWithRelations]()
   let targetRowsByThrough = groupRowsByTuple(relatedRows, relation.through.throughTargetKey)
 
   return sourceRows.map((sourceRow) => {
@@ -2033,7 +2135,7 @@ async function loadPrimaryKeyRowsForScope<table extends AnyTable>(
 
   let rows = await query
     .select(...(getTablePrimaryKey(table) as (keyof TableRow<table> & string)[]))
-    .all()
+    [loadRowsWithRelations]()
   let primaryKeys = getTablePrimaryKey(table) as string[]
 
   return rows.map((row) => {
@@ -2109,7 +2211,7 @@ function prepareUpdateValues<table extends AnyTable>(
   values: Partial<TableRow<table>>,
   now: unknown,
   touch: boolean,
-  operation: TableValidationOperation = 'update',
+  operation: TableWriteOperation = 'update',
 ): Record<string, unknown> {
   let output = validateWriteValues(table, values, operation)
   let timestamps = getTableTimestamps(table)
@@ -2132,10 +2234,40 @@ function prepareUpdateValues<table extends AnyTable>(
 function validateWriteValues<table extends AnyTable>(
   table: table,
   values: Partial<TableRow<table>>,
-  operation: TableValidationOperation,
+  operation: TableWriteOperation,
 ): Record<string, unknown> {
   let tableName = getTableName(table)
   let normalizedInput = normalizeWriteObject(table, values, operation)
+  let beforeWrite = getTableBeforeWrite(table)
+
+  if (beforeWrite) {
+    let beforeWriteResult = beforeWrite({
+      operation,
+      tableName,
+      value: normalizedInput as Partial<TableRow<table>>,
+    })
+    assertSynchronousCallbackResult(tableName, operation, 'beforeWrite', beforeWriteResult)
+
+    if (hasIssues(beforeWriteResult)) {
+      throwValidationIssues(tableName, beforeWriteResult.issues, operation)
+    }
+
+    if (!hasValue(beforeWriteResult)) {
+      throw new DataTableValidationError(
+        'Invalid beforeWrite callback result for table "' + tableName + '"',
+        [{ message: 'Expected beforeWrite to return { value } or { issues }' }],
+        {
+          metadata: {
+            table: tableName,
+            operation,
+          },
+        },
+      )
+    }
+
+    normalizedInput = normalizeWriteObject(table, beforeWriteResult.value, operation)
+  }
+
   let validator = getTableValidator(table)
 
   if (!validator) {
@@ -2147,6 +2279,7 @@ function validateWriteValues<table extends AnyTable>(
     tableName,
     value: normalizedInput as Partial<TableRow<table>>,
   })
+  assertSynchronousCallbackResult(tableName, operation, 'validate', validationResult)
 
   if (hasIssues(validationResult)) {
     throwValidationIssues(tableName, validationResult.issues, operation)
@@ -2179,7 +2312,7 @@ function hasValue(value: unknown): value is { value: unknown } {
 function normalizeWriteObject<table extends AnyTable>(
   table: table,
   value: unknown,
-  operation: TableValidationOperation,
+  operation: TableWriteOperation,
 ): Record<string, unknown> {
   let tableName = getTableName(table)
   let columns = getTableColumns(table)
@@ -2227,7 +2360,7 @@ function normalizeWriteObject<table extends AnyTable>(
 function throwValidationIssues(
   tableName: string,
   issues: ReadonlyArray<ValidationIssue>,
-  operation: TableValidationOperation,
+  operation: TableLifecycleOperation,
 ): never {
   let firstIssue = issues[0]
   let issuePath = firstIssue?.path
@@ -2254,6 +2387,208 @@ function throwValidationIssues(
       operation,
     },
   })
+}
+
+function assertSynchronousCallbackResult(
+  tableName: string,
+  operation: TableLifecycleOperation,
+  callbackName: string,
+  value: unknown,
+): void {
+  if (!isPromiseLike(value)) {
+    return
+  }
+
+  throw new DataTableValidationError(
+    'Invalid ' + callbackName + ' callback result for table "' + tableName + '"',
+    [{ message: callbackName + ' callbacks must be synchronous and cannot return a Promise' }],
+    {
+      metadata: {
+        table: tableName,
+        operation,
+      },
+    },
+  )
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    'then' in value &&
+    typeof (value as { then?: unknown }).then === 'function'
+  )
+}
+
+function runBeforeDeleteHook<table extends AnyTable>(
+  table: table,
+  context: TableBeforeDeleteContext,
+): void {
+  let callback = getTableBeforeDelete(table)
+
+  if (!callback) {
+    return
+  }
+
+  let callbackResult = callback(context)
+  assertSynchronousCallbackResult(context.tableName, 'delete', 'beforeDelete', callbackResult)
+
+  if (callbackResult === undefined) {
+    return
+  }
+
+  if (hasIssues(callbackResult)) {
+    throwValidationIssues(context.tableName, callbackResult.issues, 'delete')
+  }
+
+  throw new DataTableValidationError(
+    'Invalid beforeDelete callback result for table "' + context.tableName + '"',
+    [{ message: 'Expected beforeDelete to return nothing or { issues }' }],
+    {
+      metadata: {
+        table: context.tableName,
+        operation: 'delete',
+      },
+    },
+  )
+}
+
+function runAfterWriteHook<table extends AnyTable>(
+  table: table,
+  context: TableAfterWriteContext<TableRow<table>>,
+): void {
+  let callback = getTableAfterWrite(table)
+
+  if (!callback) {
+    return
+  }
+
+  let callbackResult = callback(context)
+  assertSynchronousCallbackResult(context.tableName, context.operation, 'afterWrite', callbackResult)
+}
+
+function runAfterDeleteHook<table extends AnyTable>(
+  table: table,
+  context: TableAfterDeleteContext,
+): void {
+  let callback = getTableAfterDelete(table)
+
+  if (!callback) {
+    return
+  }
+
+  let callbackResult = callback(context)
+  assertSynchronousCallbackResult(context.tableName, 'delete', 'afterDelete', callbackResult)
+}
+
+function applyAfterReadHooksToRows<table extends AnyTable>(
+  table: table,
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  let callback = getTableAfterRead(table)
+
+  if (!callback || rows.length === 0) {
+    return rows
+  }
+
+  let tableName = getTableName(table)
+
+  return rows.map((row) => {
+    let callbackResult = callback({
+      tableName,
+      value: row as TableRow<table>,
+    })
+    assertSynchronousCallbackResult(tableName, 'read', 'afterRead', callbackResult)
+
+    if (hasIssues(callbackResult)) {
+      throwValidationIssues(tableName, callbackResult.issues, 'read')
+    }
+
+    if (!hasValue(callbackResult)) {
+      throw new DataTableValidationError(
+        'Invalid afterRead callback result for table "' + tableName + '"',
+        [{ message: 'Expected afterRead to return { value } or { issues }' }],
+        {
+          metadata: {
+            table: tableName,
+            operation: 'read',
+          },
+        },
+      )
+    }
+
+    return normalizeReadObject(tableName, callbackResult.value)
+  })
+}
+
+function applyAfterReadHooksToLoadedRows(
+  table: AnyTable,
+  rows: Record<string, unknown>[],
+  relationMap: Record<string, AnyRelation>,
+): Record<string, unknown>[] {
+  if (rows.length === 0) {
+    return rows
+  }
+
+  let relationNames = Object.keys(relationMap)
+
+  if (relationNames.length > 0) {
+    for (let row of rows) {
+      for (let relationName of relationNames) {
+        let relation = relationMap[relationName]
+        let relationValue = row[relationName]
+
+        if (relation.cardinality === 'many') {
+          if (!Array.isArray(relationValue)) {
+            continue
+          }
+
+          row[relationName] = applyAfterReadHooksToLoadedRows(
+            relation.targetTable,
+            relationValue as Record<string, unknown>[],
+            relation.modifiers.with,
+          )
+          continue
+        }
+
+        if (relationValue === null || relationValue === undefined) {
+          continue
+        }
+
+        if (typeof relationValue !== 'object' || Array.isArray(relationValue)) {
+          continue
+        }
+
+        let transformed = applyAfterReadHooksToLoadedRows(
+          relation.targetTable,
+          [relationValue as Record<string, unknown>],
+          relation.modifiers.with,
+        )
+        row[relationName] = transformed[0] ?? null
+      }
+    }
+  }
+
+  return applyAfterReadHooksToRows(table, rows)
+}
+
+function normalizeReadObject(tableName: string, value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new DataTableValidationError(
+      'Invalid afterRead callback result for table "' + tableName + '"',
+      [{ message: 'Expected afterRead to return an object value' }],
+      {
+        metadata: {
+          table: tableName,
+          operation: 'read',
+        },
+      },
+    )
+  }
+
+  return {
+    ...(value as Record<string, unknown>),
+  }
 }
 
 type ResolvedPredicateColumn = {

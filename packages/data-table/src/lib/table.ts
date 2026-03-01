@@ -21,6 +21,8 @@ export { columnMetadataKey, tableMetadataKey } from './references.ts'
 export type TableColumnsDefinition = Record<string, ColumnBuilder<any>>
 
 export type TableValidationOperation = 'create' | 'update'
+export type TableWriteOperation = TableValidationOperation
+export type TableLifecycleOperation = TableWriteOperation | 'delete' | 'read'
 
 export type ValidationIssue = {
   message: string
@@ -40,6 +42,68 @@ export type TableValidationResult<row extends Record<string, unknown>> =
 export type TableValidate<row extends Record<string, unknown>> = (
   context: TableValidationContext<row>,
 ) => TableValidationResult<row>
+
+export type TableBeforeWriteContext<row extends Record<string, unknown>> = {
+  operation: TableWriteOperation
+  tableName: string
+  value: Partial<row>
+}
+
+export type TableBeforeWriteResult<row extends Record<string, unknown>> =
+  | { value: Partial<row> }
+  | { issues: ReadonlyArray<ValidationIssue> }
+
+export type TableBeforeWrite<row extends Record<string, unknown>> = (
+  context: TableBeforeWriteContext<row>,
+) => TableBeforeWriteResult<row>
+
+export type TableAfterWriteContext<row extends Record<string, unknown>> = {
+  operation: TableWriteOperation
+  tableName: string
+  values: ReadonlyArray<Partial<row>>
+  affectedRows: number
+  insertId?: unknown
+}
+
+export type TableAfterWrite<row extends Record<string, unknown>> = (
+  context: TableAfterWriteContext<row>,
+) => void
+
+export type TableBeforeDeleteContext = {
+  tableName: string
+  where: ReadonlyArray<Predicate<string>>
+  orderBy: ReadonlyArray<OrderByClause>
+  limit?: number
+  offset?: number
+}
+
+export type TableBeforeDeleteResult = void | { issues: ReadonlyArray<ValidationIssue> }
+
+export type TableBeforeDelete = (context: TableBeforeDeleteContext) => TableBeforeDeleteResult
+
+export type TableAfterDeleteContext = {
+  tableName: string
+  where: ReadonlyArray<Predicate<string>>
+  orderBy: ReadonlyArray<OrderByClause>
+  limit?: number
+  offset?: number
+  affectedRows: number
+}
+
+export type TableAfterDelete = (context: TableAfterDeleteContext) => void
+
+export type TableAfterReadContext<row extends Record<string, unknown>> = {
+  tableName: string
+  value: row
+}
+
+export type TableAfterReadResult<row extends Record<string, unknown>> =
+  | { value: row }
+  | { issues: ReadonlyArray<ValidationIssue> }
+
+export type TableAfterRead<row extends Record<string, unknown>> = (
+  context: TableAfterReadContext<row>,
+) => TableAfterReadResult<row>
 
 type ColumnNameFromColumns<columns extends TableColumnsDefinition> = keyof columns & string
 
@@ -79,6 +143,11 @@ type TableMetadata<
   columnDefinitions: {
     [column in keyof columns & string]: ColumnDefinition
   }
+  beforeWrite?: TableBeforeWrite<TableRowFromColumns<columns>>
+  afterWrite?: TableAfterWrite<TableRowFromColumns<columns>>
+  beforeDelete?: TableBeforeDelete
+  afterDelete?: TableAfterDelete
+  afterRead?: TableAfterRead<TableRowFromColumns<columns>>
   validate?: TableValidate<TableRowFromColumns<columns>>
 }
 
@@ -129,6 +198,11 @@ export type AnyTable = TableMetadataLike<
     primaryKey: readonly string[]
     timestamps: TimestampConfig | null
     columnDefinitions: Record<string, ColumnDefinition>
+    beforeWrite?: unknown
+    afterWrite?: unknown
+    beforeDelete?: unknown
+    afterDelete?: unknown
+    afterRead?: unknown
     validate?: TableValidate<Record<string, unknown>>
   }
 } & Record<string, unknown>
@@ -222,6 +296,61 @@ export function getTableValidator<table extends AnyTable>(
   table: table,
 ): TableValidate<TableRow<table>> | undefined {
   return table[tableMetadataKey].validate as TableValidate<TableRow<table>> | undefined
+}
+
+/**
+ * Returns a table's optional before-write lifecycle callback.
+ * @param table Source table instance.
+ * @returns Before-write callback or `undefined`.
+ */
+export function getTableBeforeWrite<table extends AnyTable>(
+  table: table,
+): TableBeforeWrite<TableRow<table>> | undefined {
+  return table[tableMetadataKey].beforeWrite as TableBeforeWrite<TableRow<table>> | undefined
+}
+
+/**
+ * Returns a table's optional after-write lifecycle callback.
+ * @param table Source table instance.
+ * @returns After-write callback or `undefined`.
+ */
+export function getTableAfterWrite<table extends AnyTable>(
+  table: table,
+): TableAfterWrite<TableRow<table>> | undefined {
+  return table[tableMetadataKey].afterWrite as TableAfterWrite<TableRow<table>> | undefined
+}
+
+/**
+ * Returns a table's optional before-delete lifecycle callback.
+ * @param table Source table instance.
+ * @returns Before-delete callback or `undefined`.
+ */
+export function getTableBeforeDelete<table extends AnyTable>(
+  table: table,
+): TableBeforeDelete | undefined {
+  return table[tableMetadataKey].beforeDelete as TableBeforeDelete | undefined
+}
+
+/**
+ * Returns a table's optional after-delete lifecycle callback.
+ * @param table Source table instance.
+ * @returns After-delete callback or `undefined`.
+ */
+export function getTableAfterDelete<table extends AnyTable>(
+  table: table,
+): TableAfterDelete | undefined {
+  return table[tableMetadataKey].afterDelete as TableAfterDelete | undefined
+}
+
+/**
+ * Returns a table's optional after-read lifecycle callback.
+ * @param table Source table instance.
+ * @returns After-read callback or `undefined`.
+ */
+export function getTableAfterRead<table extends AnyTable>(
+  table: table,
+): TableAfterRead<TableRow<table>> | undefined {
+  return table[tableMetadataKey].afterRead as TableAfterRead<TableRow<table>> | undefined
 }
 
 /**
@@ -351,6 +480,11 @@ export type CreateTableOptions<
   columns: columns
   primaryKey?: primaryKey
   timestamps?: TimestampOptions
+  beforeWrite?: TableBeforeWrite<TableRowFromColumns<columns>>
+  afterWrite?: TableAfterWrite<TableRowFromColumns<columns>>
+  beforeDelete?: TableBeforeDelete
+  afterDelete?: TableAfterDelete
+  afterRead?: TableAfterRead<TableRowFromColumns<columns>>
   validate?: TableValidate<TableRowFromColumns<columns>>
 }
 
@@ -402,6 +536,11 @@ export function table<
       primaryKey: resolvedPrimaryKey,
       timestamps: timestampConfig,
       columnDefinitions,
+      beforeWrite: options.beforeWrite as TableBeforeWrite<TableRowFromColumns<columns>> | undefined,
+      afterWrite: options.afterWrite as TableAfterWrite<TableRowFromColumns<columns>> | undefined,
+      beforeDelete: options.beforeDelete as TableBeforeDelete | undefined,
+      afterDelete: options.afterDelete as TableAfterDelete | undefined,
+      afterRead: options.afterRead as TableAfterRead<TableRowFromColumns<columns>> | undefined,
       validate: options.validate as TableValidate<TableRowFromColumns<columns>> | undefined,
     }),
     enumerable: false,

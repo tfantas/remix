@@ -4,6 +4,11 @@ import { describe, it } from 'node:test'
 import { column } from './column.ts'
 import {
   columnMetadataKey,
+  getTableAfterDelete,
+  getTableAfterRead,
+  getTableAfterWrite,
+  getTableBeforeDelete,
+  getTableBeforeWrite,
   getTableValidator,
   getTableName,
   getTablePrimaryKey,
@@ -78,6 +83,32 @@ describe('table metadata', () => {
     assert.deepEqual(updateResult, { value: { id: 2 } })
 
     assert.deepEqual(calls, ['create', 'update'])
+  })
+
+  it('stores optional lifecycle callbacks on table metadata', () => {
+    let beforeWrite = () => ({ value: {} })
+    let afterWrite = () => {}
+    let beforeDelete = () => undefined
+    let afterDelete = () => {}
+    let afterRead = ({ value }: { value: { id: number } }) => ({ value })
+
+    let users = table({
+      name: 'users',
+      columns: {
+        id: column.integer(),
+      },
+      beforeWrite,
+      afterWrite,
+      beforeDelete,
+      afterDelete,
+      afterRead,
+    })
+
+    assert.equal(getTableBeforeWrite(users), beforeWrite)
+    assert.equal(getTableAfterWrite(users), afterWrite)
+    assert.equal(getTableBeforeDelete(users), beforeDelete)
+    assert.equal(getTableAfterDelete(users), afterDelete)
+    assert.equal(getTableAfterRead(users), afterRead)
   })
 
   it('builds relations with functional helpers', () => {
