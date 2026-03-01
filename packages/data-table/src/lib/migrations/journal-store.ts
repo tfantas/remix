@@ -79,8 +79,8 @@ export async function insertJournalRow(
     operation: {
       kind: 'raw',
       sql: rawSql(
-        'insert into ' + tableName + ' (id, name, checksum, batch, applied_at) values (?, ?, ?, ?, ?)',
-        [row.id, row.name, row.checksum, row.batch, new Date().toISOString()],
+        'insert into ' + tableName + ' (id, name, checksum, batch) values (?, ?, ?, ?)',
+        [row.id, row.name, row.checksum, row.batch],
       ),
     },
     transaction,
