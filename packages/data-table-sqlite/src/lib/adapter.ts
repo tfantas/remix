@@ -63,7 +63,7 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
       return [{ text: compiled.text, values: compiled.values }]
     }
 
-    return compileSqliteMigrationStatements(operation)
+    return compileSqliteMigrationOperations(operation)
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
@@ -236,7 +236,7 @@ function normalizeInsertIdForReader(
   operation: DataManipulationRequest['operation'],
   rows: Record<string, unknown>[],
 ): unknown {
-  if (!isInsertStatementKind(kind) || !isInsertStatement(operation)) {
+  if (!isInsertOperationKind(kind) || !isInsertOperation(operation)) {
     return undefined
   }
 
@@ -268,7 +268,7 @@ function normalizeInsertIdForRun(
   operation: DataManipulationRequest['operation'],
   result: RunResult,
 ): unknown {
-  if (!isInsertStatementKind(kind) || !isInsertStatement(operation)) {
+  if (!isInsertOperationKind(kind) || !isInsertOperation(operation)) {
     return undefined
   }
 
@@ -301,11 +301,11 @@ function isWriteStatementKind(kind: DataManipulationRequest['operation']['kind']
   )
 }
 
-function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
+function isInsertOperationKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
-function isInsertStatement(
+function isInsertOperation(
   operation: DataManipulationRequest['operation'],
 ): operation is Extract<
   DataManipulationRequest['operation'],
@@ -322,7 +322,7 @@ function isDataManipulationOperation(
   return isDataManipulationOperationHelper(operation)
 }
 
-function compileSqliteMigrationStatements(operation: DataMigrationOperation): SqlStatement[] {
+function compileSqliteMigrationOperations(operation: DataMigrationOperation): SqlStatement[] {
   if (operation.kind === 'raw') {
     return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }

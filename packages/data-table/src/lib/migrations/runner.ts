@@ -1,6 +1,7 @@
 import { createDatabase } from '../database.ts'
 import type { Database as DataManipulationDatabase } from '../database.ts'
 import type { DatabaseAdapter, TransactionToken } from '../adapter.ts'
+import type { SqlStatement } from '../sql.ts'
 import type {
   Database as MigrationsDatabase,
   MigrateOptions,
@@ -126,7 +127,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
   assertStepOption(step)
   assertTargetOption(migrations, target)
 
-  let sql: Array<{ text: string; values: unknown[] }> = []
+  let sql: SqlStatement[] = []
 
   await adapter.acquireMigrationLock?.()
 

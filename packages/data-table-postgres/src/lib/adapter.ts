@@ -99,7 +99,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
       return [{ text: compiled.text, values: compiled.values }]
     }
 
-    return compilePostgresMigrationStatements(operation)
+    return compilePostgresMigrationOperations(operation)
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
@@ -344,7 +344,7 @@ function normalizeInsertId(
   operation: DataManipulationRequest['operation'],
   rows: Record<string, unknown>[],
 ): unknown {
-  if (!isInsertStatementKind(kind) || !isInsertStatement(operation)) {
+  if (!isInsertOperationKind(kind) || !isInsertOperation(operation)) {
     return undefined
   }
 
@@ -364,11 +364,11 @@ function quoteIdentifier(value: string): string {
   return '"' + value.replace(/"/g, '""') + '"'
 }
 
-function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
+function isInsertOperationKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
-function isInsertStatement(
+function isInsertOperation(
   operation: DataManipulationRequest['operation'],
 ): operation is Extract<
   DataManipulationRequest['operation'],
@@ -385,7 +385,7 @@ function isDataManipulationOperation(
   return isDataManipulationOperationHelper(operation)
 }
 
-function compilePostgresMigrationStatements(operation: DataMigrationOperation): SqlStatement[] {
+function compilePostgresMigrationOperations(operation: DataMigrationOperation): SqlStatement[] {
   if (operation.kind === 'raw') {
     return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }

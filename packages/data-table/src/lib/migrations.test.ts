@@ -636,8 +636,8 @@ describe('migration runner', () => {
         await db.dropCheck('app.accounts', 'accounts_global_check')
         await db.raw('analyze')
 
-        let journalExists = await db.tableExists('data_table_migrations')
-        let idColumnExists = await db.columnExists('app.accounts', 'id')
+        let journalExists = await db.hasTable('data_table_migrations')
+        let idColumnExists = await db.hasColumn('app.accounts', 'id')
 
         if (!journalExists || !idColumnExists) {
           throw new Error('Expected schema introspection checks to succeed')
@@ -673,8 +673,8 @@ describe('migration runner', () => {
     let adapter = new MemoryMigrationAdapter()
     let migration = createMigration({
       async up({ db }) {
-        let tableExists = await db.tableExists('app.users')
-        let columnExists = await db.columnExists('app.users', 'email')
+        let tableExists = await db.hasTable('app.users')
+        let columnExists = await db.hasColumn('app.users', 'email')
 
         if (tableExists || columnExists) {
           throw new Error('Expected false for dry-run schema introspection')

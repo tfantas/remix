@@ -357,7 +357,7 @@ export function createSchemaApi(
         sql: statement,
       })
     },
-    async tableExists(name) {
+    async hasTable(name) {
       try {
         await db.exec(rawSql('select 1 from ' + name + ' limit 1'))
         return true
@@ -365,7 +365,7 @@ export function createSchemaApi(
         return false
       }
     },
-    async columnExists(table, columnName) {
+    async hasColumn(table, columnName) {
       try {
         await db.exec(rawSql('select ' + columnName + ' from ' + table + ' where 1 = 0'))
         return true

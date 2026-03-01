@@ -72,11 +72,11 @@ export function compileSqliteOperation(
   }
 
   if (operation.kind === 'insert') {
-    return compileInsertStatement(operation.table, operation.values, operation.returning, context)
+    return compileInsertOperation(operation.table, operation.values, operation.returning, context)
   }
 
   if (operation.kind === 'insertMany') {
-    return compileInsertManyStatement(
+    return compileInsertManyOperation(
       operation.table,
       operation.values,
       operation.returning,
@@ -113,13 +113,13 @@ export function compileSqliteOperation(
   }
 
   if (operation.kind === 'upsert') {
-    return compileUpsertStatement(operation, context)
+    return compileUpsertOperation(operation, context)
   }
 
   throw new Error('Unsupported operation kind')
 }
 
-function compileInsertStatement(
+function compileInsertOperation(
   table: OperationTable,
   values: Record<string, unknown>,
   returning: '*' | string[] | undefined,
@@ -152,7 +152,7 @@ function compileInsertStatement(
   }
 }
 
-function compileInsertManyStatement(
+function compileInsertManyOperation(
   table: OperationTable,
   rows: Record<string, unknown>[],
   returning: '*' | string[] | undefined,
@@ -203,7 +203,7 @@ function compileInsertManyStatement(
   }
 }
 
-function compileUpsertStatement(
+function compileUpsertOperation(
   operation: UpsertOperation,
   context: CompileContext,
 ): SqlStatement {

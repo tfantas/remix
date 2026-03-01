@@ -101,7 +101,7 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
       return [{ text: compiled.text, values: compiled.values }]
     }
 
-    return compileMysqlMigrationStatements(operation)
+    return compileMysqlMigrationOperations(operation)
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
@@ -343,7 +343,7 @@ function normalizeInsertId(
   operation: DataManipulationRequest['operation'],
   header: MysqlQueryResultHeader,
 ): unknown {
-  if (!isInsertStatementKind(kind) || !isInsertStatement(operation)) {
+  if (!isInsertOperationKind(kind) || !isInsertOperation(operation)) {
     return undefined
   }
 
@@ -366,11 +366,11 @@ function quoteLiteral(value: unknown): string {
   return quoteLiteralHelper(value)
 }
 
-function isInsertStatementKind(kind: DataManipulationRequest['operation']['kind']): boolean {
+function isInsertOperationKind(kind: DataManipulationRequest['operation']['kind']): boolean {
   return kind === 'insert' || kind === 'insertMany' || kind === 'upsert'
 }
 
-function isInsertStatement(
+function isInsertOperation(
   operation: DataManipulationRequest['operation'],
 ): operation is Extract<
   DataManipulationRequest['operation'],
@@ -387,7 +387,7 @@ function isDataManipulationOperation(
   return isDataManipulationOperationHelper(operation)
 }
 
-function compileMysqlMigrationStatements(operation: DataMigrationOperation): SqlStatement[] {
+function compileMysqlMigrationOperations(operation: DataMigrationOperation): SqlStatement[] {
   if (operation.kind === 'raw') {
     return [{ text: operation.sql.text, values: [...operation.sql.values] }]
   }

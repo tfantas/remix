@@ -150,7 +150,7 @@ export type MigrateOptions =
 export type MigrateResult = {
   applied: MigrationStatusEntry[]
   reverted: MigrationStatusEntry[]
-  sql: Array<{ text: string; values: unknown[] }>
+  sql: SqlStatement[]
 }
 
 /**
@@ -233,8 +233,8 @@ export interface MigrationOperations {
   addCheck(table: string, name: string, expression: string): Promise<void>
   dropCheck(table: string, name: string): Promise<void>
   raw(sql: string | SqlStatement): Promise<void>
-  tableExists(name: string): Promise<boolean>
-  columnExists(table: string, column: string): Promise<boolean>
+  hasTable(name: string): Promise<boolean>
+  hasColumn(table: string, column: string): Promise<boolean>
 }
 
 /**

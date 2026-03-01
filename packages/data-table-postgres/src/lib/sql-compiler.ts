@@ -18,7 +18,7 @@ export function compilePostgresOperation(
   operation: DataManipulationOperation,
 ): SqlStatement {
   if (operation.kind === 'raw') {
-    return compileRawStatement(operation.sql)
+    return compileRawOperation(operation.sql)
   }
 
   let context: CompileContext = { values: [] }
@@ -71,11 +71,11 @@ export function compilePostgresOperation(
   }
 
   if (operation.kind === 'insert') {
-    return compileInsertStatement(operation.table, operation.values, operation.returning, context)
+    return compileInsertOperation(operation.table, operation.values, operation.returning, context)
   }
 
   if (operation.kind === 'insertMany') {
-    return compileInsertManyStatement(
+    return compileInsertManyOperation(
       operation.table,
       operation.values,
       operation.returning,
@@ -113,13 +113,13 @@ export function compilePostgresOperation(
   }
 
   if (operation.kind === 'upsert') {
-    return compileUpsertStatement(operation, context)
+    return compileUpsertOperation(operation, context)
   }
 
   throw new Error('Unsupported operation kind')
 }
 
-function compileInsertStatement(
+function compileInsertOperation(
   table: OperationTable,
   values: Record<string, unknown>,
   returning: '*' | string[] | undefined,
@@ -155,7 +155,7 @@ function compileInsertStatement(
   }
 }
 
-function compileInsertManyStatement(
+function compileInsertManyOperation(
   table: OperationTable,
   rows: Record<string, unknown>[],
   returning: '*' | string[] | undefined,
@@ -205,7 +205,7 @@ function compileInsertManyStatement(
   }
 }
 
-function compileUpsertStatement(
+function compileUpsertOperation(
   operation: UpsertOperation,
   context: CompileContext,
 ): SqlStatement {
@@ -255,7 +255,7 @@ function compileUpsertStatement(
   }
 }
 
-function compileRawStatement(statement: SqlStatement): SqlStatement {
+function compileRawOperation(statement: SqlStatement): SqlStatement {
   if (!statement.text.includes('?')) {
     return {
       text: statement.text,
