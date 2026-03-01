@@ -40,7 +40,9 @@ export async function loadMigrations(directory: string): Promise<MigrationDescri
 
   for (let entry of files) {
     if (seenIds.has(entry.id)) {
-      throw new Error('Duplicate migration id "' + entry.id + '" inferred from filename "' + entry.file + '"')
+      throw new Error(
+        'Duplicate migration id "' + entry.id + '" inferred from filename "' + entry.file + '"',
+      )
     }
 
     seenIds.add(entry.id)
@@ -51,7 +53,9 @@ export async function loadMigrations(directory: string): Promise<MigrationDescri
     let migration = module.default
 
     if (!migration || typeof migration.up !== 'function' || typeof migration.down !== 'function') {
-      throw new Error('Migration file "' + entry.file + '" must default-export createMigration(...)')
+      throw new Error(
+        'Migration file "' + entry.file + '" must default-export createMigration(...)',
+      )
     }
 
     migrations.push({

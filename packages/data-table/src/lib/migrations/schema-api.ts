@@ -12,11 +12,7 @@ import type {
   UniqueConstraint,
 } from '../adapter.ts'
 import { rawSql } from '../sql.ts'
-import {
-  getTableColumnDefinitions,
-  getTableName,
-  getTablePrimaryKey,
-} from '../table.ts'
+import { getTableColumnDefinitions, getTableName, getTablePrimaryKey } from '../table.ts'
 import type { AnyTable } from '../table.ts'
 import type {
   AlterTableBuilder,
@@ -151,7 +147,11 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
   }
 
   addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void {
-    this.alterChanges.push({ kind: 'addColumn', column: name, definition: asColumnDefinition(definition) })
+    this.alterChanges.push({
+      kind: 'addColumn',
+      column: name,
+      definition: asColumnDefinition(definition),
+    })
   }
 
   changeColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void {
@@ -219,7 +219,12 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
         },
         name:
           options?.name ??
-          createForeignKeyName(this.table, normalizedColumns, referenceTable, normalizedReferenceColumns),
+          createForeignKeyName(
+            this.table,
+            normalizedColumns,
+            referenceTable,
+            normalizedReferenceColumns,
+          ),
         onDelete: options?.onDelete,
         onUpdate: options?.onUpdate,
       },
@@ -244,10 +249,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
     this.alterChanges.push({ kind: 'dropCheck', name })
   }
 
-  addIndex(
-    columns: string | string[],
-    options?: CreateIndexOptions,
-  ): void {
+  addIndex(columns: string | string[], options?: CreateIndexOptions): void {
     let normalizedColumns = normalizeIndexColumns(columns)
     let { name, ifNotExists, ...indexOptions } = options ?? {}
     this.extraStatements.push({
@@ -362,7 +364,12 @@ export function createMigrationSchema(
           },
           name:
             options?.name ??
-            createForeignKeyName(tableRef, normalizedColumns, referenceTable, normalizedReferenceColumns),
+            createForeignKeyName(
+              tableRef,
+              normalizedColumns,
+              referenceTable,
+              normalizedReferenceColumns,
+            ),
           onDelete: options?.onDelete,
           onUpdate: options?.onUpdate,
         },

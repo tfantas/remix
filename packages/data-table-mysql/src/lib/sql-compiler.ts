@@ -14,9 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileMysqlOperation(
-  operation: DataManipulationOperation,
-): SqlStatement {
+export function compileMysqlOperation(operation: DataManipulationOperation): SqlStatement {
   if (operation.kind === 'raw') {
     return {
       text: operation.sql.text,
@@ -88,7 +86,9 @@ export function compileMysqlOperation(
         quotePath(getTableName(operation.table)) +
         ' set ' +
         columns
-          .map((column) => quotePath(column) + ' = ' + pushValue(context, operation.changes[column]))
+          .map(
+            (column) => quotePath(column) + ' = ' + pushValue(context, operation.changes[column]),
+          )
           .join(', ') +
         compileWhereClause(operation.where, context),
       values: context.values,
@@ -184,10 +184,7 @@ function compileInsertManyOperation(
   }
 }
 
-function compileUpsertOperation(
-  operation: UpsertOperation,
-  context: CompileContext,
-): SqlStatement {
+function compileUpsertOperation(operation: UpsertOperation, context: CompileContext): SqlStatement {
   let insertColumns = Object.keys(operation.values)
 
   if (insertColumns.length === 0) {

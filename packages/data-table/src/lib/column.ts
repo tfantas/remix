@@ -194,7 +194,9 @@ export type ColumnNamespace = {
   enum<values extends readonly string[]>(values: values): ColumnBuilder<values[number]>
 }
 
-function createColumnBuilder<output = unknown>(type: ColumnDefinition['type']): ColumnBuilder<output> {
+function createColumnBuilder<output = unknown>(
+  type: ColumnDefinition['type'],
+): ColumnBuilder<output> {
   return new ColumnBuilder({ type })
 }
 

@@ -90,7 +90,9 @@ export default createMigration({
       },
     })
     await schema.createTable(passwordResetTokens)
-    await schema.createIndex('password_reset_tokens', 'user_id', { name: 'password_reset_tokens_user_id_idx' })
+    await schema.createIndex('password_reset_tokens', 'user_id', {
+      name: 'password_reset_tokens_user_id_idx',
+    })
   },
   async down({ schema }) {
     await schema.dropTable('password_reset_tokens', { ifExists: true })

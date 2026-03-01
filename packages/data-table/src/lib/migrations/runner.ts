@@ -65,7 +65,10 @@ function assertTargetOption(migrations: MigrationDescriptor[], to: string | unde
   }
 }
 
-function assertNoMigrationDrift(migrations: MigrationDescriptor[], journal: MigrationJournalRow[]): void {
+function assertNoMigrationDrift(
+  migrations: MigrationDescriptor[],
+  journal: MigrationJournalRow[],
+): void {
   let migrationMap = new Map(migrations.map((migration) => [migration.id, migration]))
 
   for (let row of journal) {
@@ -170,7 +173,9 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
         toRun = toRun.slice(0, step)
       }
     } else {
-      let appliedMigrations = migrations.filter((migration) => appliedMap.has(migration.id)).reverse()
+      let appliedMigrations = migrations
+        .filter((migration) => appliedMap.has(migration.id))
+        .reverse()
 
       if (target) {
         appliedMigrations = appliedMigrations.filter((migration) => migration.id >= target)
@@ -188,9 +193,14 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
     let batch = getBatch(journal)
 
     for (let migration of toRun) {
-      if (migration.migration.transaction === 'required' && !adapter.capabilities.transactionalDdl) {
+      if (
+        migration.migration.transaction === 'required' &&
+        !adapter.capabilities.transactionalDdl
+      ) {
         throw new Error(
-          'Migration "' + migration.id + '" requires transactional DDL, but adapter does not support it',
+          'Migration "' +
+            migration.id +
+            '" requires transactional DDL, but adapter does not support it',
         )
       }
 
@@ -353,7 +363,10 @@ export function createMigrationRunner(
         return {
           id: migration.id,
           name: migration.name,
-          status: checksum === journalRow.checksum ? ('applied' as MigrationStatus) : ('drifted' as MigrationStatus),
+          status:
+            checksum === journalRow.checksum
+              ? ('applied' as MigrationStatus)
+              : ('drifted' as MigrationStatus),
           appliedAt: journalRow.appliedAt,
           batch: journalRow.batch,
           checksum: journalRow.checksum,

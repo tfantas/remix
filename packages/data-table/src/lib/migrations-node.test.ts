@@ -13,24 +13,12 @@ describe('migration node loader', () => {
     try {
       await writeFile(
         path.join(directory, '20260101000000_create_users.mjs'),
-        [
-          'export default {',
-          '  async up() {},',
-          '  async down() {},',
-          '}',
-          '',
-        ].join('\n'),
+        ['export default {', '  async up() {},', '  async down() {},', '}', ''].join('\n'),
       )
 
       await writeFile(
         path.join(directory, '20260102000000_add_posts.mjs'),
-        [
-          'export default {',
-          '  async up() {},',
-          '  async down() {},',
-          '}',
-          '',
-        ].join('\n'),
+        ['export default {', '  async up() {},', '  async down() {},', '}', ''].join('\n'),
       )
 
       let migrations = await loadMigrations(directory)
@@ -52,13 +40,7 @@ describe('migration node loader', () => {
     try {
       await writeFile(
         path.join(directory, 'create_users.mjs'),
-        [
-          'export default {',
-          '  async up() {},',
-          '  async down() {},',
-          '}',
-          '',
-        ].join('\n'),
+        ['export default {', '  async up() {},', '  async down() {},', '}', ''].join('\n'),
       )
 
       await assert.rejects(
@@ -76,24 +58,12 @@ describe('migration node loader', () => {
     try {
       await writeFile(
         path.join(directory, '20260101000000_create_users.mjs'),
-        [
-          'export default {',
-          '  async up() {},',
-          '  async down() {},',
-          '}',
-          '',
-        ].join('\n'),
+        ['export default {', '  async up() {},', '  async down() {},', '}', ''].join('\n'),
       )
 
       await writeFile(
         path.join(directory, '20260101000000_add_users_index.mjs'),
-        [
-          'export default {',
-          '  async up() {},',
-          '  async down() {},',
-          '}',
-          '',
-        ].join('\n'),
+        ['export default {', '  async up() {},', '  async down() {},', '}', ''].join('\n'),
       )
 
       await assert.rejects(() => loadMigrations(directory), /Duplicate migration id/)

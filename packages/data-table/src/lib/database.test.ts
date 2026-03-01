@@ -1111,10 +1111,12 @@ describe('writes and validation', () => {
     } satisfies DatabaseAdapter
 
     let db = createDatabase(adapter)
-    await db.query(validatedAccounts).upsert(
-      { id: 1, email: 'a@studio.test', status: 'inactive' },
-      { conflictTarget: ['id'], update: { status: 'active' } },
-    )
+    await db
+      .query(validatedAccounts)
+      .upsert(
+        { id: 1, email: 'a@studio.test', status: 'inactive' },
+        { conflictTarget: ['id'], update: { status: 'active' } },
+      )
 
     assert.deepEqual(operations, ['create', 'create'])
   })
@@ -1443,10 +1445,9 @@ describe('writes and validation', () => {
     assert.equal(rows[0].email, 'AMY@STUDIO.TEST')
     assert.equal(rows[0].projects[0].name, 'Spring Campaign!')
 
-    let insertResult = await db.query(readableAccounts).insert(
-      { id: 2, email: 'new@studio.test', status: 'active' },
-      { returning: '*' },
-    )
+    let insertResult = await db
+      .query(readableAccounts)
+      .insert({ id: 2, email: 'new@studio.test', status: 'active' }, { returning: '*' })
 
     if ('row' in insertResult && insertResult.row) {
       assert.equal(insertResult.row.email, 'NEW@STUDIO.TEST')

@@ -1,11 +1,6 @@
 import type { ColumnDefinition } from './adapter.ts'
-import {
-  ColumnBuilder,
-} from './column.ts'
-import type {
-  ColumnInput as ColumnBuilderInput,
-  ColumnOutput,
-} from './column.ts'
+import { ColumnBuilder } from './column.ts'
+import type { ColumnInput as ColumnBuilderInput, ColumnOutput } from './column.ts'
 import type { Predicate, WhereInput } from './operators.ts'
 import { inferForeignKey } from './inflection.ts'
 import { normalizeWhereInput } from './operators.ts'
@@ -286,7 +281,9 @@ export function getTableColumns<table extends AnyTable>(table: table): TableColu
  * @param table Source table instance.
  * @returns Column definition map.
  */
-export function getTableColumnDefinitions<table extends AnyTable>(table: table): {
+export function getTableColumnDefinitions<table extends AnyTable>(
+  table: table,
+): {
   [column in keyof TableColumns<table> & string]: ColumnDefinition
 } {
   return table[tableMetadataKey].columnDefinitions as {
@@ -586,7 +583,9 @@ export function table<
       primaryKey: resolvedPrimaryKey,
       timestamps: timestampConfig,
       columnDefinitions,
-      beforeWrite: options.beforeWrite as TableBeforeWrite<TableRowFromColumns<columns>> | undefined,
+      beforeWrite: options.beforeWrite as
+        | TableBeforeWrite<TableRowFromColumns<columns>>
+        | undefined,
       afterWrite: options.afterWrite as TableAfterWrite<TableRowFromColumns<columns>> | undefined,
       beforeDelete: options.beforeDelete as TableBeforeDelete | undefined,
       afterDelete: options.afterDelete as TableAfterDelete | undefined,
@@ -616,10 +615,7 @@ export function table<
   return Object.freeze(table) as Table<name, columns, NormalizePrimaryKey<columns, primaryKey>>
 }
 
-function createColumnReference<
-  tableName extends string,
-  columnName extends string,
->(
+function createColumnReference<tableName extends string, columnName extends string>(
   tableName: tableName,
   columnName: columnName,
 ): ColumnReference<tableName, columnName> {
@@ -826,7 +822,10 @@ export function hasManyThrough<source extends AnyTable, target extends AnyTable>
  * Convenience helper for standard snake_case timestamp columns.
  * @returns Column-builder map for `created_at`/`updated_at`.
  */
-export function timestamps(): Record<'created_at' | 'updated_at', ColumnBuilder<Date | string | number>> {
+export function timestamps(): Record<
+  'created_at' | 'updated_at',
+  ColumnBuilder<Date | string | number>
+> {
   let timestampColumn = () => new ColumnBuilder<Date | string | number>({ type: 'timestamp' })
 
   return {
@@ -841,9 +840,9 @@ export type PrimaryKeyInput<table extends AnyTable> =
       ? ColumnBuilderInput<TableColumns<table>[column]>
       : never
     : Pretty<{
-        [column in TablePrimaryKey<table>[number] & keyof TableColumns<table> & string]: ColumnBuilderInput<
-          TableColumns<table>[column]
-        >
+        [column in TablePrimaryKey<table>[number] &
+          keyof TableColumns<table> &
+          string]: ColumnBuilderInput<TableColumns<table>[column]>
       }>
 
 /**

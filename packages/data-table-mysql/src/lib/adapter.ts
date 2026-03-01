@@ -450,7 +450,8 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
 
   if (operation.kind === 'createTable') {
     let columns = Object.keys(operation.columns).map(
-      (columnName) => quoteIdentifier(columnName) + ' ' + compileMysqlColumn(operation.columns[columnName]),
+      (columnName) =>
+        quoteIdentifier(columnName) + ' ' + compileMysqlColumn(operation.columns[columnName]),
     )
     let constraints: string[] = []
 
@@ -477,12 +478,7 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
 
     for (let check of operation.checks ?? []) {
       constraints.push(
-        'constraint ' +
-          quoteIdentifier(check.name) +
-          ' ' +
-          'check (' +
-          check.expression +
-          ')',
+        'constraint ' + quoteIdentifier(check.name) + ' ' + 'check (' + check.expression + ')',
       )
     }
 
@@ -522,7 +518,11 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
 
     if (operation.comment) {
       statements.push({
-        text: 'alter table ' + quoteTableRef(operation.table) + ' comment = ' + quoteLiteral(operation.comment),
+        text:
+          'alter table ' +
+          quoteTableRef(operation.table) +
+          ' comment = ' +
+          quoteLiteral(operation.comment),
         values: [],
       })
     }
@@ -537,13 +537,19 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
       let sql = 'alter table ' + quoteTableRef(operation.table) + ' '
 
       if (change.kind === 'addColumn') {
-        sql += 'add column ' + quoteIdentifier(change.column) + ' ' + compileMysqlColumn(change.definition)
+        sql +=
+          'add column ' +
+          quoteIdentifier(change.column) +
+          ' ' +
+          compileMysqlColumn(change.definition)
       } else if (change.kind === 'changeColumn') {
         sql +=
-          'modify column ' + quoteIdentifier(change.column) + ' ' + compileMysqlColumn(change.definition)
+          'modify column ' +
+          quoteIdentifier(change.column) +
+          ' ' +
+          compileMysqlColumn(change.definition)
       } else if (change.kind === 'renameColumn') {
-        sql +=
-          'rename column ' + quoteIdentifier(change.from) + ' to ' + quoteIdentifier(change.to)
+        sql += 'rename column ' + quoteIdentifier(change.from) + ' to ' + quoteIdentifier(change.to)
       } else if (change.kind === 'dropColumn') {
         sql += 'drop column ' + quoteIdentifier(change.column)
       } else if (change.kind === 'addPrimaryKey') {
@@ -605,7 +611,8 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
   if (operation.kind === 'renameTable') {
     return [
       {
-        text: 'rename table ' + quoteTableRef(operation.from) + ' to ' + quoteTableRef(operation.to),
+        text:
+          'rename table ' + quoteTableRef(operation.from) + ' to ' + quoteTableRef(operation.to),
         values: [],
       },
     ]
@@ -615,9 +622,7 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
     return [
       {
         text:
-          'drop table ' +
-          (operation.ifExists ? 'if exists ' : '') +
-          quoteTableRef(operation.table),
+          'drop table ' + (operation.ifExists ? 'if exists ' : '') + quoteTableRef(operation.table),
         values: [],
       },
     ]
@@ -646,7 +651,8 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
   if (operation.kind === 'dropIndex') {
     return [
       {
-        text: 'drop index ' + quoteIdentifier(operation.name) + ' on ' + quoteTableRef(operation.table),
+        text:
+          'drop index ' + quoteIdentifier(operation.name) + ' on ' + quoteTableRef(operation.table),
         values: [],
       },
     ]
@@ -682,7 +688,9 @@ function compileMysqlMigrationOperations(operation: DataMigrationOperation): Sql
           ') references ' +
           quoteTableRef(operation.constraint.references.table) +
           ' (' +
-          operation.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.constraint.references.columns
+            .map((column) => quoteIdentifier(column))
+            .join(', ') +
           ')' +
           (operation.constraint.onDelete ? ' on delete ' + operation.constraint.onDelete : '') +
           (operation.constraint.onUpdate ? ' on update ' + operation.constraint.onUpdate : ''),

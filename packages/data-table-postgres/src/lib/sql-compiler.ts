@@ -14,9 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compilePostgresOperation(
-  operation: DataManipulationOperation,
-): SqlStatement {
+export function compilePostgresOperation(operation: DataManipulationOperation): SqlStatement {
   if (operation.kind === 'raw') {
     return compileRawOperation(operation.sql)
   }
@@ -205,10 +203,7 @@ function compileInsertManyOperation(
   }
 }
 
-function compileUpsertOperation(
-  operation: UpsertOperation,
-  context: CompileContext,
-): SqlStatement {
+function compileUpsertOperation(operation: UpsertOperation, context: CompileContext): SqlStatement {
   let insertColumns = Object.keys(operation.values)
   let conflictTarget = operation.conflictTarget ?? [...getTablePrimaryKey(operation.table)]
 

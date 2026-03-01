@@ -752,7 +752,10 @@ class DatabaseRuntime implements Database {
     return toWriteResult(result)
   }
 
-  async exec(statement: string | SqlStatement, values: unknown[] = []): Promise<DataManipulationResult> {
+  async exec(
+    statement: string | SqlStatement,
+    values: unknown[] = [],
+  ): Promise<DataManipulationResult> {
     let sqlStatement = isSqlStatement(statement) ? statement : rawSql(statement, values)
 
     return this[executeOperation]({
@@ -1155,11 +1158,9 @@ export class QueryBuilder<
    */
   async all(): Promise<Array<row & loaded>> {
     let rows = await this[loadRowsWithRelations]()
-    return applyAfterReadHooksToLoadedRows(
-      this.#table,
-      rows,
-      this.#state.with,
-    ) as Array<row & loaded>
+    return applyAfterReadHooksToLoadedRows(this.#table, rows, this.#state.with) as Array<
+      row & loaded
+    >
   }
 
   async [loadRowsWithRelations](): Promise<Record<string, unknown>[]> {
@@ -1285,9 +1286,8 @@ export class QueryBuilder<
       }
 
       let result = await this.#database[executeOperation](operation)
-      let row = (applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows))[0] ?? null) as
-        | row
-        | null
+      let row = (applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows))[0] ??
+        null) as row | null
       let affectedRows = result.affectedRows ?? 0
       runAfterWriteHook(this.#table, {
         operation: 'create',
@@ -1653,9 +1653,8 @@ export class QueryBuilder<
       }
 
       let result = await this.#database[executeOperation](operation)
-      let row = (applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows))[0] ?? null) as
-        | row
-        | null
+      let row = (applyAfterReadHooksToRows(this.#table, normalizeRows(result.rows))[0] ??
+        null) as row | null
       let affectedRows = result.affectedRows ?? 0
       let preparedWriteValues = updateChanges
         ? ([preparedValues, updateChanges] as Array<Partial<row>>)
@@ -2506,7 +2505,12 @@ function runAfterWriteHook<table extends AnyTable>(
   }
 
   let callbackResult = callback(context)
-  assertSynchronousCallbackResult(context.tableName, context.operation, 'afterWrite', callbackResult)
+  assertSynchronousCallbackResult(
+    context.tableName,
+    context.operation,
+    'afterWrite',
+    callbackResult,
+  )
 }
 
 function runAfterDeleteHook<table extends AnyTable>(

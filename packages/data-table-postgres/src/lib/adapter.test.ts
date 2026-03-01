@@ -834,14 +834,20 @@ describe('postgres adapter', () => {
         nickname: { type: 'text', default: { kind: 'literal', value: null } },
         safe_slug: { type: 'text', default: { kind: 'sql', expression: 'md5(email)' } },
         created_at: { type: 'timestamp', withTimezone: true, default: { kind: 'now' } },
-        birthday: { type: 'date', default: { kind: 'literal', value: new Date('2024-01-02T00:00:00.000Z') } },
+        birthday: {
+          type: 'date',
+          default: { kind: 'literal', value: new Date('2024-01-02T00:00:00.000Z') },
+        },
         score: { type: 'decimal', precision: 10, scale: 2 },
         ratio: { type: 'decimal', precision: 8 },
         starts_at: { type: 'time', withTimezone: true },
         metadata: { type: 'json' },
         blob: { type: 'binary' },
         role: { type: 'enum', enumValues: ['admin', 'user'] },
-        name: { type: 'text', checks: [{ expression: 'length(name) > 1', name: 'users_name_len_check' }] },
+        name: {
+          type: 'text',
+          checks: [{ expression: 'length(name) > 1', name: 'users_name_len_check' }],
+        },
         manager_id: {
           type: 'integer',
           references: {
@@ -932,7 +938,10 @@ describe('postgres adapter', () => {
         { kind: 'dropColumn', column: 'legacy_email', ifExists: true },
         { kind: 'addPrimaryKey', constraint: { name: 'users_pk', columns: ['id'] } },
         { kind: 'dropPrimaryKey', name: 'users_pk' },
-        { kind: 'addUnique', constraint: { name: 'users_email_unique', columns: ['contact_email'] } },
+        {
+          kind: 'addUnique',
+          constraint: { name: 'users_email_unique', columns: ['contact_email'] },
+        },
         { kind: 'dropUnique', name: 'users_email_unique' },
         {
           kind: 'addForeignKey',
@@ -943,15 +952,24 @@ describe('postgres adapter', () => {
           },
         },
         { kind: 'dropForeignKey', name: 'users_account_fk' },
-        { kind: 'addCheck', constraint: { name: 'users_status_check', expression: "status <> 'deleted'" } },
+        {
+          kind: 'addCheck',
+          constraint: { name: 'users_status_check', expression: "status <> 'deleted'" },
+        },
         { kind: 'dropCheck', name: 'users_status_check' },
         { kind: 'setTableComment', comment: 'Updated users table' },
       ],
     })
 
     assert.equal(alterStatements.length, 13)
-    assert.equal(alterStatements[0].text, 'alter table "app"."users" add column "email" text not null')
-    assert.equal(alterStatements[1].text, 'alter table "app"."users" alter column "email" type varchar(255)')
+    assert.equal(
+      alterStatements[0].text,
+      'alter table "app"."users" add column "email" text not null',
+    )
+    assert.equal(
+      alterStatements[1].text,
+      'alter table "app"."users" alter column "email" type varchar(255)',
+    )
     assert.equal(
       alterStatements[2].text,
       'alter table "app"."users" rename column "email" to "contact_email"',
@@ -969,18 +987,30 @@ describe('postgres adapter', () => {
       alterStatements[6].text,
       'alter table "app"."users" add constraint "users_email_unique" unique ("contact_email")',
     )
-    assert.equal(alterStatements[7].text, 'alter table "app"."users" drop constraint "users_email_unique"')
+    assert.equal(
+      alterStatements[7].text,
+      'alter table "app"."users" drop constraint "users_email_unique"',
+    )
     assert.equal(
       alterStatements[8].text,
       'alter table "app"."users" add constraint "users_account_fk" foreign key ("account_id") references "accounts" ("id")',
     )
-    assert.equal(alterStatements[9].text, 'alter table "app"."users" drop constraint "users_account_fk"')
+    assert.equal(
+      alterStatements[9].text,
+      'alter table "app"."users" drop constraint "users_account_fk"',
+    )
     assert.equal(
       alterStatements[10].text,
       `alter table "app"."users" add constraint "users_status_check" check (status <> 'deleted')`,
     )
-    assert.equal(alterStatements[11].text, 'alter table "app"."users" drop constraint "users_status_check"')
-    assert.equal(alterStatements[12].text, `comment on table "app"."users" is 'Updated users table'`)
+    assert.equal(
+      alterStatements[11].text,
+      'alter table "app"."users" drop constraint "users_status_check"',
+    )
+    assert.equal(
+      alterStatements[12].text,
+      `comment on table "app"."users" is 'Updated users table'`,
+    )
 
     let createIndex = adapter.compileSql({
       kind: 'createIndex',
@@ -1092,7 +1122,9 @@ describe('postgres adapter', () => {
       {
         kind: 'alterTable',
         table: { schema: 'app', name: 'users' },
-        changes: [{ kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } }],
+        changes: [
+          { kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } },
+        ],
       },
       {
         kind: 'renameTable',

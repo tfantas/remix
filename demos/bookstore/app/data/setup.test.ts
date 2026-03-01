@@ -45,7 +45,9 @@ describe('bookstore database setup', () => {
     let migrationsPath = fileURLToPath(new URL('../../data/migrations/', import.meta.url))
     let migrations = await loadMigrations(migrationsPath)
 
-    let journalResult = await db.exec(sql`select id, name from data_table_migrations order by id asc`)
+    let journalResult = await db.exec(
+      sql`select id, name from data_table_migrations order by id asc`,
+    )
     let journalRows = getRows(journalResult)
     let journalIds = journalRows.map((row) => readRowString(row, 'id'))
     let migrationIds = migrations.map((migration) => migration.id)

@@ -1,9 +1,5 @@
 import type { Database as DataManipulationDatabase } from './database.ts'
-import type {
-  ColumnDefinition,
-  ForeignKeyAction,
-  IndexDefinition,
-} from './adapter.ts'
+import type { ColumnDefinition, ForeignKeyAction, IndexDefinition } from './adapter.ts'
 import type { ColumnBuilder } from './column.ts'
 import type { SqlStatement } from './sql.ts'
 import type { AnyTable } from './table.ts'
@@ -238,10 +234,7 @@ export interface AlterTableBuilder {
   dropForeignKey(name: string): void
   addCheck(expression: string, options?: NamedConstraintOptions): void
   dropCheck(name: string): void
-  addIndex(
-    columns: IndexColumns,
-    options?: CreateIndexOptions,
-  ): void
+  addIndex(columns: IndexColumns, options?: CreateIndexOptions): void
   dropIndex(name: string): void
   comment(text: string): void
 }
@@ -258,11 +251,7 @@ export interface MigrationSchema {
   ): Promise<void>
   renameTable(from: TableInput, to: string): Promise<void>
   dropTable(table: TableInput, options?: DropTableOptions): Promise<void>
-  createIndex(
-    table: TableInput,
-    columns: IndexColumns,
-    options?: CreateIndexOptions,
-  ): Promise<void>
+  createIndex(table: TableInput, columns: IndexColumns, options?: CreateIndexOptions): Promise<void>
   dropIndex(table: TableInput, name: string, options?: { ifExists?: boolean }): Promise<void>
   renameIndex(table: TableInput, from: string, to: string): Promise<void>
   addForeignKey(

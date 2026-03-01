@@ -445,7 +445,10 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
         email: { type: 'varchar', unique: true },
         display_name: { type: 'text', default: { kind: 'literal', value: "o'hare" } },
         created_at: { type: 'timestamp', default: { kind: 'now' } },
-        updated_at: { type: 'timestamp', default: { kind: 'sql', expression: '(current_timestamp)' } },
+        updated_at: {
+          type: 'timestamp',
+          default: { kind: 'sql', expression: '(current_timestamp)' },
+        },
         reviewed_at: {
           type: 'timestamp',
           default: { kind: 'literal', value: new Date('2026-01-01T00:00:00.000Z') },
@@ -525,7 +528,10 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
       createTableStatements[0].text,
       /"account_id" integer references "app"\."accounts" \("id"\) on delete set null on update cascade/,
     )
-    assert.match(createTableStatements[0].text, /"guarded_value" integer check \(guarded_value > 0\)/)
+    assert.match(
+      createTableStatements[0].text,
+      /"guarded_value" integer check \(guarded_value > 0\)/,
+    )
     assert.match(createTableStatements[0].text, /"unknown_type" text/)
     assert.match(createTableStatements[0].text, /primary key \("id"\)/)
     assert.match(createTableStatements[0].text, /unique \("email"\)/)
@@ -779,7 +785,9 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
       {
         kind: 'alterTable',
         table: { schema: 'app', name: 'users' },
-        changes: [{ kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } }],
+        changes: [
+          { kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } },
+        ],
       },
       {
         kind: 'renameTable',

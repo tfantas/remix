@@ -118,7 +118,9 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
       this.#assertTransaction(transaction)
     }
 
-    let masterTable = table.schema ? quoteIdentifier(table.schema) + '.sqlite_master' : 'sqlite_master'
+    let masterTable = table.schema
+      ? quoteIdentifier(table.schema) + '.sqlite_master'
+      : 'sqlite_master'
     let statement = this.#database.prepare(
       'select 1 from ' + masterTable + ' where type = ? and name = ? limit 1',
     )
@@ -360,7 +362,8 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
 
   if (operation.kind === 'createTable') {
     let columns = Object.keys(operation.columns).map(
-      (columnName) => quoteIdentifier(columnName) + ' ' + compileSqliteColumn(operation.columns[columnName]),
+      (columnName) =>
+        quoteIdentifier(columnName) + ' ' + compileSqliteColumn(operation.columns[columnName]),
     )
     let constraints: string[] = []
 
@@ -387,12 +390,7 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
 
     for (let check of operation.checks ?? []) {
       constraints.push(
-        'constraint ' +
-          quoteIdentifier(check.name) +
-          ' ' +
-          'check (' +
-          check.expression +
-          ')',
+        'constraint ' + quoteIdentifier(check.name) + ' ' + 'check (' + check.expression + ')',
       )
     }
 
@@ -442,7 +440,10 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
 
       if (change.kind === 'addColumn') {
         sql +=
-          'add column ' + quoteIdentifier(change.column) + ' ' + compileSqliteColumn(change.definition)
+          'add column ' +
+          quoteIdentifier(change.column) +
+          ' ' +
+          compileSqliteColumn(change.definition)
       } else if (change.kind === 'changeColumn') {
         sql +=
           'alter column ' +
@@ -450,8 +451,7 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
           ' type ' +
           compileSqliteColumnType(change.definition)
       } else if (change.kind === 'renameColumn') {
-        sql +=
-          'rename column ' + quoteIdentifier(change.from) + ' to ' + quoteIdentifier(change.to)
+        sql += 'rename column ' + quoteIdentifier(change.from) + ' to ' + quoteIdentifier(change.to)
       } else if (change.kind === 'dropColumn') {
         sql += 'drop column ' + quoteIdentifier(change.column)
       } else if (change.kind === 'addPrimaryKey') {
@@ -514,7 +514,10 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
     return [
       {
         text:
-          'alter table ' + quoteTableRef(operation.from) + ' rename to ' + quoteIdentifier(operation.to.name),
+          'alter table ' +
+          quoteTableRef(operation.from) +
+          ' rename to ' +
+          quoteIdentifier(operation.to.name),
         values: [],
       },
     ]
@@ -524,9 +527,7 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
     return [
       {
         text:
-          'drop table ' +
-          (operation.ifExists ? 'if exists ' : '') +
-          quoteTableRef(operation.table),
+          'drop table ' + (operation.ifExists ? 'if exists ' : '') + quoteTableRef(operation.table),
         values: [],
       },
     ]
@@ -555,7 +556,10 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
   if (operation.kind === 'dropIndex') {
     return [
       {
-        text: 'drop index ' + (operation.ifExists ? 'if exists ' : '') + quoteIdentifier(operation.name),
+        text:
+          'drop index ' +
+          (operation.ifExists ? 'if exists ' : '') +
+          quoteIdentifier(operation.name),
         values: [],
       },
     ]
@@ -591,7 +595,9 @@ function compileSqliteMigrationOperations(operation: DataMigrationOperation): Sq
           ') references ' +
           quoteTableRef(operation.constraint.references.table) +
           ' (' +
-          operation.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.constraint.references.columns
+            .map((column) => quoteIdentifier(column))
+            .join(', ') +
           ')' +
           (operation.constraint.onDelete ? ' on delete ' + operation.constraint.onDelete : '') +
           (operation.constraint.onUpdate ? ' on update ' + operation.constraint.onUpdate : ''),

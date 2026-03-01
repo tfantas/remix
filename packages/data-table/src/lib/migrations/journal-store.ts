@@ -10,7 +10,10 @@ export function normalizeChecksum(migration: MigrationDescriptor): string {
   return migration.id + ':' + migration.name
 }
 
-export async function ensureMigrationJournal(adapter: DatabaseAdapter, tableName: string): Promise<void> {
+export async function ensureMigrationJournal(
+  adapter: DatabaseAdapter,
+  tableName: string,
+): Promise<void> {
   await adapter.migrate({
     operation: {
       kind: 'createTable',
@@ -27,7 +30,10 @@ export async function ensureMigrationJournal(adapter: DatabaseAdapter, tableName
   })
 }
 
-export async function hasMigrationJournal(adapter: DatabaseAdapter, tableName: string): Promise<boolean> {
+export async function hasMigrationJournal(
+  adapter: DatabaseAdapter,
+  tableName: string,
+): Promise<boolean> {
   try {
     await adapter.execute({
       operation: {
@@ -49,7 +55,9 @@ export async function loadJournalRows(
   let result = await adapter.execute({
     operation: {
       kind: 'raw',
-      sql: rawSql('select id, name, checksum, batch, applied_at from ' + tableName + ' order by id asc'),
+      sql: rawSql(
+        'select id, name, checksum, batch, applied_at from ' + tableName + ' order by id asc',
+      ),
     },
   })
 
@@ -78,10 +86,12 @@ export async function insertJournalRow(
   await adapter.execute({
     operation: {
       kind: 'raw',
-      sql: rawSql(
-        'insert into ' + tableName + ' (id, name, checksum, batch) values (?, ?, ?, ?)',
-        [row.id, row.name, row.checksum, row.batch],
-      ),
+      sql: rawSql('insert into ' + tableName + ' (id, name, checksum, batch) values (?, ?, ?, ?)', [
+        row.id,
+        row.name,
+        row.checksum,
+        row.batch,
+      ]),
     },
     transaction,
   })

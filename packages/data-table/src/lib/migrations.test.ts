@@ -55,7 +55,9 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   #transactionCounter = 0
   #tokens = new Set<string>()
 
-  compileSql(operation: DataMigrationOperation | DataManipulationRequest['operation']): SqlStatement[] {
+  compileSql(
+    operation: DataMigrationOperation | DataManipulationRequest['operation'],
+  ): SqlStatement[] {
     return [{ text: operation.kind, values: [] }]
   }
 
@@ -152,7 +154,10 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
     }
 
     if (operation.kind === 'createTable') {
-      this.knownTables.set(tableRefKey(operation.table), new Set<string>(Object.keys(operation.columns)))
+      this.knownTables.set(
+        tableRefKey(operation.table),
+        new Set<string>(Object.keys(operation.columns)),
+      )
     }
 
     if (operation.kind === 'dropTable') {
@@ -202,7 +207,11 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
     return this.knownTables.has(tableRefKey(table))
   }
 
-  async hasColumn(table: TableRef, column: string, transaction?: TransactionToken): Promise<boolean> {
+  async hasColumn(
+    table: TableRef,
+    column: string,
+    transaction?: TransactionToken,
+  ): Promise<boolean> {
     this.hasColumnTransactionIds.push(transaction?.id)
 
     if (transaction) {
@@ -316,11 +325,17 @@ describe('migration column builder', () => {
   })
 
   it('throws when onDelete is called before references', () => {
-    assert.throws(() => column.integer().onDelete('cascade'), /requires references\(\) to be set first/)
+    assert.throws(
+      () => column.integer().onDelete('cascade'),
+      /requires references\(\) to be set first/,
+    )
   })
 
   it('throws when onUpdate is called before references', () => {
-    assert.throws(() => column.integer().onUpdate('cascade'), /requires references\(\) to be set first/)
+    assert.throws(
+      () => column.integer().onUpdate('cascade'),
+      /requires references\(\) to be set first/,
+    )
   })
 
   it('supports every column constructor and modifier', () => {
@@ -433,7 +448,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'users', migration },
+    ])
 
     await runner.up()
 
@@ -504,7 +521,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'names', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'names', migration },
+    ])
     await runner.up()
 
     let createUsers = adapter.migratedOperations[1]
@@ -591,7 +610,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'named', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'named', migration },
+    ])
     await runner.up()
 
     let createIndex = adapter.migratedOperations[1]
@@ -695,7 +716,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'users', migration },
+    ])
 
     let result = await runner.up({ dryRun: true })
 
@@ -747,7 +770,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'users', migration },
+    ])
 
     await assert.rejects(() => runner.up(), /Forced migrate failure/)
     assert.equal(adapter.lockAcquireCount, 1)
@@ -766,7 +791,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'users', migration },
+    ])
 
     await assert.rejects(() => runner.up(), /requires transactional DDL/)
   })
@@ -780,7 +807,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'users', migration },
+    ])
 
     await assert.rejects(() => runner.up({ to: '99999999999999' }), /Unknown migration target/)
     await assert.rejects(() => runner.up({ step: 0 }), /positive integer/)
@@ -884,7 +913,9 @@ describe('migration runner', () => {
           table.dropUnique('accounts_status_uq')
           table.addForeignKey('id', accountsTable, 'id', { name: 'accounts_self_fk' })
           table.dropForeignKey('accounts_self_fk')
-          table.addCheck("account_status in ('active', 'disabled')", { name: 'accounts_status_check' })
+          table.addCheck("account_status in ('active', 'disabled')", {
+            name: 'accounts_status_check',
+          })
           table.dropCheck('accounts_status_check')
           table.addIndex(['account_status', 'id'], {
             name: 'accounts_status_idx',
@@ -922,7 +953,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'accounts', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'accounts', migration },
+    ])
     await runner.up()
 
     let kinds = adapter.migratedOperations.map((operation) => operation.kind)
@@ -957,14 +990,18 @@ describe('migration runner', () => {
       throw new Error('Expected alterTable operation at index 2')
     }
 
-    let addPrimaryKeyChange = alterTableOperation.changes.find((change) => change.kind === 'addPrimaryKey')
+    let addPrimaryKeyChange = alterTableOperation.changes.find(
+      (change) => change.kind === 'addPrimaryKey',
+    )
     assert.ok(addPrimaryKeyChange)
     if (!addPrimaryKeyChange || addPrimaryKeyChange.kind !== 'addPrimaryKey') {
       throw new Error('Expected addPrimaryKey change')
     }
     assert.deepEqual(addPrimaryKeyChange.constraint.columns, ['id'])
 
-    let addForeignKeyChange = alterTableOperation.changes.find((change) => change.kind === 'addForeignKey')
+    let addForeignKeyChange = alterTableOperation.changes.find(
+      (change) => change.kind === 'addForeignKey',
+    )
     assert.ok(addForeignKeyChange)
     if (!addForeignKeyChange || addForeignKeyChange.kind !== 'addForeignKey') {
       throw new Error('Expected addForeignKey change')
@@ -1001,7 +1038,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'tx_scope', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'tx_scope', migration },
+    ])
     await runner.up()
 
     assert.equal(adapter.beginTransactionCount, 1)
@@ -1046,7 +1085,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'dry_run', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'dry_run', migration },
+    ])
     await runner.up({ dryRun: true })
   })
 
@@ -1059,7 +1100,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'dry_run_exec', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'dry_run_exec', migration },
+    ])
     await assert.rejects(
       () => runner.up({ dryRun: true }),
       (error: unknown) =>
@@ -1067,7 +1110,8 @@ describe('migration runner', () => {
         error.message === 'Adapter execution failed' &&
         'cause' in error &&
         error.cause instanceof Error &&
-        error.cause.message === 'Cannot execute data operations while running migrations with dryRun',
+        error.cause.message ===
+          'Cannot execute data operations while running migrations with dryRun',
     )
   })
 
@@ -1087,7 +1131,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'dry_run_compile', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'dry_run_compile', migration },
+    ])
     await runner.up({ dryRun: true })
   })
 
@@ -1129,10 +1175,15 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'users', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'users', migration },
+    ])
     let result = await runner.up({ dryRun: true })
 
-    assert.deepEqual(result.applied.map((entry) => entry.id), ['20260101000000'])
+    assert.deepEqual(
+      result.applied.map((entry) => entry.id),
+      ['20260101000000'],
+    )
     assert.deepEqual(result.sql, [{ text: 'createTable', values: [] }])
   })
 
@@ -1154,7 +1205,9 @@ describe('migration runner', () => {
       async down() {},
     })
 
-    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'current', migration }])
+    let runner = createMigrationRunner(adapter, [
+      { id: '20260101000000', name: 'current', migration },
+    ])
     await runner.up({ dryRun: true })
   })
 
@@ -1186,7 +1239,10 @@ describe('migration runner', () => {
     ])
 
     let statuses = await driftedRunner.status()
-    assert.deepEqual(statuses.map((status) => status.status), ['drifted'])
+    assert.deepEqual(
+      statuses.map((status) => status.status),
+      ['drifted'],
+    )
   })
 })
 

@@ -439,7 +439,8 @@ function compilePostgresMigrationOperations(operation: DataMigrationOperation): 
 
   if (operation.kind === 'createTable') {
     let columns = Object.keys(operation.columns).map(
-      (columnName) => quoteIdentifier(columnName) + ' ' + compilePostgresColumn(operation.columns[columnName]),
+      (columnName) =>
+        quoteIdentifier(columnName) + ' ' + compilePostgresColumn(operation.columns[columnName]),
     )
     let tableConstraints: string[] = []
 
@@ -466,12 +467,7 @@ function compilePostgresMigrationOperations(operation: DataMigrationOperation): 
 
     for (let check of operation.checks ?? []) {
       tableConstraints.push(
-        'constraint ' +
-          quoteIdentifier(check.name) +
-          ' ' +
-          'check (' +
-          check.expression +
-          ')',
+        'constraint ' + quoteIdentifier(check.name) + ' ' + 'check (' + check.expression + ')',
       )
     }
 
@@ -510,7 +506,11 @@ function compilePostgresMigrationOperations(operation: DataMigrationOperation): 
 
     if (operation.comment) {
       statements.push({
-        text: 'comment on table ' + quoteTableRef(operation.table) + ' is ' + quoteLiteral(operation.comment),
+        text:
+          'comment on table ' +
+          quoteTableRef(operation.table) +
+          ' is ' +
+          quoteLiteral(operation.comment),
         values: [],
       })
     }
@@ -532,22 +532,12 @@ function compilePostgresMigrationOperations(operation: DataMigrationOperation): 
           compilePostgresColumn(change.definition)
       } else if (change.kind === 'changeColumn') {
         let typeSql = compilePostgresColumnType(change.definition)
-        sql +=
-          'alter column ' +
-          quoteIdentifier(change.column) +
-          ' type ' +
-          typeSql
+        sql += 'alter column ' + quoteIdentifier(change.column) + ' type ' + typeSql
       } else if (change.kind === 'renameColumn') {
-        sql +=
-          'rename column ' +
-          quoteIdentifier(change.from) +
-          ' to ' +
-          quoteIdentifier(change.to)
+        sql += 'rename column ' + quoteIdentifier(change.from) + ' to ' + quoteIdentifier(change.to)
       } else if (change.kind === 'dropColumn') {
         sql +=
-          'drop column ' +
-          (change.ifExists ? 'if exists ' : '') +
-          quoteIdentifier(change.column)
+          'drop column ' + (change.ifExists ? 'if exists ' : '') + quoteIdentifier(change.column)
       } else if (change.kind === 'addPrimaryKey') {
         sql +=
           'add ' +
@@ -666,7 +656,10 @@ function compilePostgresMigrationOperations(operation: DataMigrationOperation): 
   if (operation.kind === 'dropIndex') {
     return [
       {
-        text: 'drop index ' + (operation.ifExists ? 'if exists ' : '') + quoteIdentifier(operation.name),
+        text:
+          'drop index ' +
+          (operation.ifExists ? 'if exists ' : '') +
+          quoteIdentifier(operation.name),
         values: [],
       },
     ]
@@ -700,7 +693,9 @@ function compilePostgresMigrationOperations(operation: DataMigrationOperation): 
           ') references ' +
           quoteTableRef(operation.constraint.references.table) +
           ' (' +
-          operation.constraint.references.columns.map((column) => quoteIdentifier(column)).join(', ') +
+          operation.constraint.references.columns
+            .map((column) => quoteIdentifier(column))
+            .join(', ') +
           ')' +
           (operation.constraint.onDelete ? ' on delete ' + operation.constraint.onDelete : '') +
           (operation.constraint.onUpdate ? ' on update ' + operation.constraint.onUpdate : ''),

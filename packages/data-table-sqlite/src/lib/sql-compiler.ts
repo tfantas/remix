@@ -14,9 +14,7 @@ type CompileContext = {
   values: unknown[]
 }
 
-export function compileSqliteOperation(
-  operation: DataManipulationOperation,
-): SqlStatement {
+export function compileSqliteOperation(operation: DataManipulationOperation): SqlStatement {
   if (operation.kind === 'raw') {
     return {
       text: operation.sql.text,
@@ -93,7 +91,9 @@ export function compileSqliteOperation(
         quotePath(getTableName(operation.table)) +
         ' set ' +
         columns
-          .map((column) => quotePath(column) + ' = ' + pushValue(context, operation.changes[column]))
+          .map(
+            (column) => quotePath(column) + ' = ' + pushValue(context, operation.changes[column]),
+          )
           .join(', ') +
         compileWhereClause(operation.where, context) +
         compileReturningClause(operation.returning),
@@ -203,10 +203,7 @@ function compileInsertManyOperation(
   }
 }
 
-function compileUpsertOperation(
-  operation: UpsertOperation,
-  context: CompileContext,
-): SqlStatement {
+function compileUpsertOperation(operation: UpsertOperation, context: CompileContext): SqlStatement {
   let insertColumns = Object.keys(operation.values)
   let conflictTarget = operation.conflictTarget ?? [...getTablePrimaryKey(operation.table)]
 

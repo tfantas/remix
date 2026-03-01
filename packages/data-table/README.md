@@ -274,7 +274,8 @@ let payments = table({
       value: {
         ...value,
         // Example read-time shaping
-        amount: typeof value.amount === 'number' ? Math.round(value.amount * 100) / 100 : value.amount,
+        amount:
+          typeof value.amount === 'number' ? Math.round(value.amount * 100) / 100 : value.amount,
       },
     }
   },
@@ -461,10 +462,7 @@ For key-oriented migration APIs, single-column and compound forms are both suppo
 await schema.alterTable(users, (table) => {
   table.addPrimaryKey('id')
   table.addForeignKey('account_id', 'accounts', 'id')
-  table.addForeignKey(['tenant_id', 'account_id'], 'accounts', [
-    'tenant_id',
-    'id',
-  ])
+  table.addForeignKey(['tenant_id', 'account_id'], 'accounts', ['tenant_id', 'id'])
 })
 ```
 

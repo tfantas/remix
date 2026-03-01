@@ -14,7 +14,9 @@ export function sortMigrations(migrations: MigrationDescriptor[]): MigrationDesc
  * @param input Migration list or registry.
  * @returns A sorted migration descriptor list.
  */
-export function resolveMigrations(input: MigrationDescriptor[] | MigrationRegistry): MigrationDescriptor[] {
+export function resolveMigrations(
+  input: MigrationDescriptor[] | MigrationRegistry,
+): MigrationDescriptor[] {
   if (Array.isArray(input)) {
     return sortMigrations(input)
   }

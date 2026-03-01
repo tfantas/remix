@@ -221,7 +221,10 @@ export const orders = table({
       issues.push({ message: 'Order total must be a non-negative number.', path: ['total'] })
     }
 
-    if (typeof value.shipping_address_json === 'string' && !isJsonObject(value.shipping_address_json)) {
+    if (
+      typeof value.shipping_address_json === 'string' &&
+      !isJsonObject(value.shipping_address_json)
+    ) {
       issues.push({
         message: 'Shipping address must be a valid JSON object string.',
         path: ['shipping_address_json'],
@@ -254,7 +257,10 @@ export const orderItems = table({
   validate({ value }) {
     let issues: Array<{ message: string; path?: Array<string | number> }> = []
 
-    if (typeof value.quantity === 'number' && (!Number.isInteger(value.quantity) || value.quantity < 1)) {
+    if (
+      typeof value.quantity === 'number' &&
+      (!Number.isInteger(value.quantity) || value.quantity < 1)
+    ) {
       issues.push({ message: 'Quantity must be an integer greater than 0.', path: ['quantity'] })
     }
 

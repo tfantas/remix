@@ -767,13 +767,21 @@ describe('mysql adapter', () => {
         email: { type: 'varchar' },
         display_name: { type: 'text', default: { kind: 'literal', value: "o'hare" } },
         created_at: { type: 'timestamp', default: { kind: 'now' } },
-        updated_at: { type: 'timestamp', default: { kind: 'sql', expression: '(current_timestamp)' } },
+        updated_at: {
+          type: 'timestamp',
+          default: { kind: 'sql', expression: '(current_timestamp)' },
+        },
         reviewed_at: {
           type: 'timestamp',
           default: { kind: 'literal', value: new Date('2026-01-01T00:00:00.000Z') },
         },
         optional_note: { type: 'text', default: { kind: 'literal', value: null } },
-        total: { type: 'decimal', precision: 10, scale: 2, default: { kind: 'literal', value: 3.5 } },
+        total: {
+          type: 'decimal',
+          precision: 10,
+          scale: 2,
+          default: { kind: 'literal', value: 3.5 },
+        },
         fallback_total: { type: 'decimal' },
         is_active: { type: 'boolean', default: { kind: 'literal', value: false }, unique: true },
         public_id: { type: 'uuid' },
@@ -937,7 +945,10 @@ describe('mysql adapter', () => {
       /add constraint `users_email_check` check \(char_length\(email\) > 3\)/,
     )
     assert.match(alterTableStatements[11].text, /drop check `users_email_check`/)
-    assert.equal(alterTableStatements[12].text, "alter table `app`.`users` comment = 'owner''s users'")
+    assert.equal(
+      alterTableStatements[12].text,
+      "alter table `app`.`users` comment = 'owner''s users'",
+    )
 
     let createIndexWithName = adapter.compileSql({
       kind: 'createIndex',
@@ -990,7 +1001,9 @@ describe('mysql adapter', () => {
       {
         kind: 'alterTable',
         table: { schema: 'app', name: 'users' },
-        changes: [{ kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } }],
+        changes: [
+          { kind: 'addColumn', column: 'email', definition: { type: 'text', nullable: false } },
+        ],
       },
       {
         kind: 'renameTable',
