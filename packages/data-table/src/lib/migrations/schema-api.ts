@@ -23,7 +23,7 @@ import type {
   CreateIndexOptions,
   ForeignKeyOptions,
   KeyColumns,
-  MigrationOperations,
+  MigrationSchema,
   NamedConstraintOptions,
   TableInput,
 } from '../migrations.ts'
@@ -275,11 +275,11 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
   }
 }
 
-export function createSchemaApi(
+export function createMigrationSchema(
   db: Database,
   emit: (operation: DataMigrationOperation) => Promise<void>,
   options?: { transaction?: TransactionToken },
-): MigrationOperations {
+): MigrationSchema {
   return {
     async createTable(table, options) {
       let operation = lowerTableForCreate(table)

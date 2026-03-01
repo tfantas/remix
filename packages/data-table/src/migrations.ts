@@ -7,7 +7,7 @@ export type {
   MigrationDescriptor,
   MigrationDirection,
   MigrationJournalRow,
-  MigrationOperations,
+  MigrationSchema,
   MigrationRegistry,
   MigrationRunner,
   MigrationRunnerOptions,

@@ -16,14 +16,24 @@ export type MigrationTransactionMode = 'auto' | 'required' | 'none'
 /**
  * Database API available inside migrations.
  */
-export type Database = DataManipulationDatabase & MigrationOperations
+export type Database = DataManipulationDatabase
 
 /**
  * Runtime context passed to migration `up`/`down` handlers.
  */
 export type MigrationContext = {
+  /**
+   * Adapter dialect name (for example `postgres`, `mysql`, or `sqlite`).
+   */
   dialect: string
+  /**
+   * Immediate data runtime (`query/create/update/exec/transaction`).
+   */
   db: Database
+  /**
+   * Migration schema runtime (`createTable/alterTable/createIndex/...`).
+   */
+  schema: MigrationSchema
 }
 
 /**
@@ -62,11 +72,15 @@ export type Migration = {
  * })
  *
  * export default createMigration({
- *   async up({ db }) {
- *     await db.createTable(users)
+ *   async up({ db, schema, dialect }) {
+ *     await schema.createTable(users)
+ *
+ *     if (dialect === 'sqlite') {
+ *       await db.exec('pragma foreign_keys = on')
+ *     }
  *   },
- *   async down({ db }) {
- *     await db.dropTable('users', { ifExists: true })
+ *   async down({ schema }) {
+ *     await schema.dropTable('users', { ifExists: true })
  *   },
  * })
  * ```
@@ -158,15 +172,15 @@ export type MigrateResult = {
 }
 
 /**
- * Options for `db.createTable(...)` migration operations.
+ * Options for `schema.createTable(...)` migration operations.
  */
 export type CreateTableOptions = { ifNotExists?: boolean }
 /**
- * Options for `db.alterTable(...)` migration operations.
+ * Options for `schema.alterTable(...)` migration operations.
  */
 export type AlterTableOptions = { ifExists?: boolean }
 /**
- * Options for `db.dropTable(...)` migration operations.
+ * Options for `schema.dropTable(...)` migration operations.
  */
 export type DropTableOptions = { ifExists?: boolean; cascade?: boolean }
 /**
@@ -208,7 +222,7 @@ export type CreateIndexOptions = NamedConstraintOptions &
   }
 
 /**
- * Builder API available inside `db.alterTable(name, table => ...)`.
+ * Builder API available inside `schema.alterTable(name, table => ...)`.
  */
 export interface AlterTableBuilder {
   addColumn(name: string, definition: ColumnDefinition | ColumnBuilder): void
@@ -239,7 +253,7 @@ export interface AlterTableBuilder {
 /**
  * DDL-focused operations mixed into the migration `db` object.
  */
-export interface MigrationOperations {
+export interface MigrationSchema {
   createTable<table extends AnyTable>(table: table, options?: CreateTableOptions): Promise<void>
   alterTable(
     table: TableInput,

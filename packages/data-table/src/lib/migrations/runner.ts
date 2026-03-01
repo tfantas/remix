@@ -3,7 +3,7 @@ import type { Database as DataManipulationDatabase } from '../database.ts'
 import type { DatabaseAdapter, TransactionToken } from '../adapter.ts'
 import type { SqlStatement } from '../sql.ts'
 import type {
-  Database as MigrationsDatabase,
+  Database as MigrationDatabase,
   MigrateOptions,
   MigrateResult,
   MigrationContext,
@@ -27,7 +27,7 @@ import {
   normalizeChecksum,
 } from './journal-store.ts'
 import { resolveMigrations } from './registry.ts'
-import { createSchemaApi } from './schema-api.ts'
+import { createMigrationSchema } from './schema-api.ts'
 
 type RunMigrationsInput = {
   adapter: DatabaseAdapter
@@ -210,19 +210,24 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
           ? createDatabaseWithTransaction(adapter, token)
           : createDatabase(adapter)
 
-      let migrationOperations = createSchemaApi(db, async (operation) => {
-        let compiled = adapter.compileSql(operation)
-        sql.push(...compiled)
+      let schema = createMigrationSchema(
+        db,
+        async (operation) => {
+          let compiled = adapter.compileSql(operation)
+          sql.push(...compiled)
 
-        if (!dryRun) {
-          await adapter.migrate({ operation, transaction: token })
-        }
-      }, { transaction: token })
-      let migrationDb: MigrationsDatabase = Object.assign(db, migrationOperations)
+          if (!dryRun) {
+            await adapter.migrate({ operation, transaction: token })
+          }
+        },
+        { transaction: token },
+      )
+      let migrationDb: MigrationDatabase = db
 
       let context: MigrationContext = {
         dialect: adapter.dialect,
         db: migrationDb,
+        schema,
       }
 
       try {
