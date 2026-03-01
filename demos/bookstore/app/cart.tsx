@@ -9,6 +9,7 @@ import { addToCart, removeFromCart, updateCartItem } from './data/cart.ts'
 import { Layout } from './layout.tsx'
 import { loadAuth } from './middleware/auth.ts'
 import { getCurrentCart } from './utils/context.ts'
+import { parseId } from './utils/ids.ts'
 import { render } from './utils/render.ts'
 
 export default {
@@ -33,7 +34,8 @@ export default {
           await new Promise((resolve) => setTimeout(resolve, 1000))
         }
 
-        let book = await db.find(books, formData.get('bookId') as string)
+        let bookId = parseId(formData.get('bookId'))
+        let book = bookId === undefined ? undefined : await db.find(books, bookId)
         if (!book) {
           return new Response('Book not found', { status: 404 })
         }
@@ -53,7 +55,8 @@ export default {
       async update({ db, session, formData }) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
 
-        let book = await db.find(books, formData.get('bookId') as string)
+        let bookId = parseId(formData.get('bookId'))
+        let book = bookId === undefined ? undefined : await db.find(books, bookId)
         if (!book) {
           return new Response('Book not found', { status: 404 })
         }
@@ -75,7 +78,8 @@ export default {
           await new Promise((resolve) => setTimeout(resolve, 1000))
         }
 
-        let book = await db.find(books, formData.get('bookId') as string)
+        let bookId = parseId(formData.get('bookId'))
+        let book = bookId === undefined ? undefined : await db.find(books, bookId)
         if (!book) {
           return new Response('Book not found', { status: 404 })
         }
@@ -93,7 +97,8 @@ export default {
 } satisfies Controller<typeof routes.cart>
 
 export async function toggleCart({ db, session, formData }: RequestContext<'POST'>) {
-  let book = await db.find(books, formData.get('bookId') as string)
+  let bookId = parseId(formData.get('bookId'))
+  let book = bookId === undefined ? undefined : await db.find(books, bookId)
   if (!book) {
     return new Response('Book not found', { status: 404 })
   }

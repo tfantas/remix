@@ -6,6 +6,7 @@ import { users } from './data/schema.ts'
 import { Layout } from './layout.tsx'
 import { render } from './utils/render.ts'
 import { getCurrentUser } from './utils/context.ts'
+import { parseId } from './utils/ids.ts'
 import { RestfulForm } from './components/restful-form.tsx'
 
 export default {
@@ -79,7 +80,8 @@ export default {
   },
 
   async show({ db, params }) {
-    let targetUser = await db.find(users, params.userId)
+    let userId = parseId(params.userId)
+    let targetUser = userId === undefined ? undefined : await db.find(users, userId)
 
     if (!targetUser) {
       return render(
@@ -131,7 +133,8 @@ export default {
   },
 
   async edit({ db, params }) {
-    let targetUser = await db.find(users, params.userId)
+    let userId = parseId(params.userId)
+    let targetUser = userId === undefined ? undefined : await db.find(users, userId)
 
     if (!targetUser) {
       return render(
@@ -192,7 +195,8 @@ export default {
   },
 
   async update({ db, formData, params }) {
-    let targetUser = await db.find(users, params.userId)
+    let userId = parseId(params.userId)
+    let targetUser = userId === undefined ? undefined : await db.find(users, userId)
     if (targetUser) {
       await db.update(users, targetUser.id, {
         name: formData.get('name')?.toString() ?? '',
@@ -205,7 +209,8 @@ export default {
   },
 
   async destroy({ db, params }) {
-    let targetUser = await db.find(users, params.userId)
+    let userId = parseId(params.userId)
+    let targetUser = userId === undefined ? undefined : await db.find(users, userId)
     if (targetUser) {
       await db.delete(users, targetUser.id)
     }

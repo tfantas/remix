@@ -8,6 +8,7 @@ import { itemsByOrder, orders, orderItemsWithBook } from './data/schema.ts'
 import { Layout } from './layout.tsx'
 import { render } from './utils/render.ts'
 import { getCurrentUser, getCurrentCart } from './utils/context.ts'
+import { parseId } from './utils/ids.ts'
 
 export default {
   middleware: [requireAuth()],
@@ -166,9 +167,13 @@ export default {
 
     async confirmation({ db, params }) {
       let user = getCurrentUser()
-      let order = await db.find(orders, params.orderId, {
-        with: { items: orderItemsWithBook },
-      })
+      let orderId = parseId(params.orderId)
+      let order =
+        orderId === undefined
+          ? undefined
+          : await db.find(orders, orderId, {
+              with: { items: orderItemsWithBook },
+            })
 
       if (!order || order.user_id !== user.id) {
         return render(

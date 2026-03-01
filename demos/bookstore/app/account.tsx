@@ -6,6 +6,7 @@ import { Layout } from './layout.tsx'
 import { requireAuth } from './middleware/auth.ts'
 import { orders, orderItemsWithBook, users } from './data/schema.ts'
 import { getCurrentUser } from './utils/context.ts'
+import { parseId } from './utils/ids.ts'
 import { render } from './utils/render.ts'
 import { RestfulForm } from './components/restful-form.tsx'
 
@@ -189,9 +190,13 @@ export default {
 
       async show({ db, params }) {
         let user = getCurrentUser()
-        let order = await db.find(orders, params.orderId, {
-          with: { items: orderItemsWithBook },
-        })
+        let orderId = parseId(params.orderId)
+        let order =
+          orderId === undefined
+            ? undefined
+            : await db.find(orders, orderId, {
+                with: { items: orderItemsWithBook },
+              })
 
         if (!order || order.user_id !== user.id) {
           return render(

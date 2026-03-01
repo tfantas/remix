@@ -5,6 +5,7 @@ import { redirect } from 'remix/response/redirect'
 import { routes } from '../routes.ts'
 import { users } from '../data/schema.ts'
 import { setCurrentUser } from '../utils/context.ts'
+import { parseId } from '../utils/ids.ts'
 
 /**
  * Middleware that optionally loads the current user if authenticated.
@@ -13,10 +14,9 @@ import { setCurrentUser } from '../utils/context.ts'
  */
 export function loadAuth(): Middleware {
   return async ({ db, session }) => {
-    let userId = session.get('userId')
+    let userId = parseId(session.get('userId'))
 
-    // Only set current user if authenticated
-    if (typeof userId === 'string' || typeof userId === 'number') {
+    if (userId !== undefined) {
       let user = await db.find(users, userId)
       if (user) {
         setCurrentUser(user)
@@ -42,11 +42,8 @@ export function requireAuth(options?: RequireAuthOptions): Middleware {
   let redirectRoute = options?.redirectTo ?? routes.auth.login.index
 
   return async ({ db, session, url }) => {
-    let userId = session.get('userId')
-    let user =
-      typeof userId === 'string' || typeof userId === 'number'
-        ? await db.find(users, userId)
-        : undefined
+    let userId = parseId(session.get('userId'))
+    let user = userId === undefined ? undefined : await db.find(users, userId)
 
     if (!user) {
       // Capture the current URL to redirect back to after login

@@ -4,6 +4,7 @@ import { redirect } from 'remix/response/redirect'
 import { routes } from './routes.ts'
 import { books } from './data/schema.ts'
 import { Layout } from './layout.tsx'
+import { parseId } from './utils/ids.ts'
 import { render } from './utils/render.ts'
 import { RestfulForm } from './components/restful-form.tsx'
 
@@ -84,7 +85,8 @@ export default {
   },
 
   async show({ db, params }) {
-    let book = await db.find(books, params.bookId)
+    let bookId = parseId(params.bookId)
+    let book = bookId === undefined ? undefined : await db.find(books, bookId)
 
     if (!book) {
       return render(
@@ -250,7 +252,8 @@ export default {
   },
 
   async edit({ db, params }) {
-    let book = await db.find(books, params.bookId)
+    let bookId = parseId(params.bookId)
+    let book = bookId === undefined ? undefined : await db.find(books, bookId)
 
     if (!book) {
       return render(
@@ -375,7 +378,8 @@ export default {
   },
 
   async update({ db, formData, params }) {
-    let book = await db.find(books, params.bookId)
+    let bookId = parseId(params.bookId)
+    let book = bookId === undefined ? undefined : await db.find(books, bookId)
     if (!book) {
       return new Response('Book not found', { status: 404 })
     }
@@ -401,7 +405,8 @@ export default {
   },
 
   async destroy({ db, params }) {
-    let book = await db.find(books, params.bookId)
+    let bookId = parseId(params.bookId)
+    let book = bookId === undefined ? undefined : await db.find(books, bookId)
     if (book) {
       await db.delete(books, book.id)
     }

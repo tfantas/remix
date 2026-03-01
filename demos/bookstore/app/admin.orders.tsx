@@ -3,6 +3,7 @@ import type { Controller } from 'remix/fetch-router'
 import { routes } from './routes.ts'
 import { orders, orderItemsWithBook } from './data/schema.ts'
 import { Layout } from './layout.tsx'
+import { parseId } from './utils/ids.ts'
 import { render } from './utils/render.ts'
 
 export default {
@@ -63,9 +64,13 @@ export default {
   },
 
   async show({ db, params }) {
-    let order = await db.find(orders, params.orderId, {
-      with: { items: orderItemsWithBook },
-    })
+    let orderId = parseId(params.orderId)
+    let order =
+      orderId === undefined
+        ? undefined
+        : await db.find(orders, orderId, {
+            with: { items: orderItemsWithBook },
+          })
 
     if (!order) {
       return render(

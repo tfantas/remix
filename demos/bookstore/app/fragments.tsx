@@ -6,6 +6,7 @@ import { getCartTotal } from './data/cart.ts'
 import { books } from './data/schema.ts'
 import { loadAuth } from './middleware/auth.ts'
 import { getCurrentCart, getCurrentUserSafely } from './utils/context.ts'
+import { parseId } from './utils/ids.ts'
 import { renderFragment } from './utils/render.ts'
 import { routes as appRoutes } from './routes.ts'
 
@@ -13,7 +14,8 @@ export default {
   middleware: [loadAuth()],
   actions: {
     async cartButton({ db, params }) {
-      let book = await db.find(books, params.bookId)
+      let bookId = parseId(params.bookId)
+      let book = bookId === undefined ? undefined : await db.find(books, bookId)
 
       if (!book) {
         return renderFragment(<p>Book not found</p>, { status: 404 })
