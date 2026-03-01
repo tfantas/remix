@@ -120,11 +120,13 @@ export type {
   TableValidationResult,
   TimestampConfig,
   TimestampOptions,
+  ValidationFailure,
   ValidationIssue,
 } from './lib/table.ts'
 export {
   belongsTo,
   columnMetadataKey,
+  fail,
   getTableColumns,
   getTableColumnDefinitions,
   getTableBeforeDelete,

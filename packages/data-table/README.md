@@ -231,7 +231,7 @@ Validation is optional and table-scoped. Define `validate(context)` to validate/
 payloads, and add lifecycle callbacks when you need custom read/write/delete behavior.
 
 ```ts
-import { column as c, table } from 'remix/data-table'
+import { column as c, fail, table } from 'remix/data-table'
 
 let payments = table({
   name: 'payments',
@@ -252,7 +252,7 @@ let payments = table({
       let amount = Number(value.amount)
 
       if (!Number.isFinite(amount)) {
-        return { issues: [{ message: 'Expected a numeric amount', path: ['amount'] }] }
+        return fail('Expected a numeric amount', ['amount'])
       }
 
       return { value: { ...value, amount } }
@@ -262,7 +262,7 @@ let payments = table({
   },
   beforeDelete({ where }) {
     if (where.length === 0) {
-      return { issues: [{ message: 'Refusing unscoped delete' }] }
+      return fail('Refusing unscoped delete')
     }
   },
   afterRead({ value }) {
@@ -280,6 +280,8 @@ let payments = table({
   },
 })
 ```
+
+Use `fail(...)` in hooks when you want to return issues without manually building `{ issues: [...] }`.
 
 Validation and lifecycle semantics:
 
@@ -350,7 +352,7 @@ let users = table({
   name: 'users',
   columns: {
     id: c.integer().primaryKey(),
-    email: c.varchar(255).notNull().unique('users_email_uq'),
+    email: c.varchar(255).notNull().unique(),
     created_at: c.timestamp({ withTimezone: true }).defaultNow(),
   },
 })

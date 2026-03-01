@@ -29,6 +29,10 @@ export type ValidationIssue = {
   path?: Array<string | number>
 }
 
+export type ValidationFailure = {
+  issues: ReadonlyArray<ValidationIssue>
+}
+
 export type TableValidationContext<row extends Record<string, unknown>> = {
   operation: TableValidationOperation
   tableName: string
@@ -37,7 +41,7 @@ export type TableValidationContext<row extends Record<string, unknown>> = {
 
 export type TableValidationResult<row extends Record<string, unknown>> =
   | { value: Partial<row> }
-  | { issues: ReadonlyArray<ValidationIssue> }
+  | ValidationFailure
 
 export type TableValidate<row extends Record<string, unknown>> = (
   context: TableValidationContext<row>,
@@ -51,7 +55,7 @@ export type TableBeforeWriteContext<row extends Record<string, unknown>> = {
 
 export type TableBeforeWriteResult<row extends Record<string, unknown>> =
   | { value: Partial<row> }
-  | { issues: ReadonlyArray<ValidationIssue> }
+  | ValidationFailure
 
 export type TableBeforeWrite<row extends Record<string, unknown>> = (
   context: TableBeforeWriteContext<row>,
@@ -77,7 +81,7 @@ export type TableBeforeDeleteContext = {
   offset?: number
 }
 
-export type TableBeforeDeleteResult = void | { issues: ReadonlyArray<ValidationIssue> }
+export type TableBeforeDeleteResult = void | ValidationFailure
 
 export type TableBeforeDelete = (context: TableBeforeDeleteContext) => TableBeforeDeleteResult
 
@@ -102,7 +106,7 @@ export type TableAfterReadContext<row extends Record<string, unknown>> = {
 
 export type TableAfterReadResult<row extends Record<string, unknown>> =
   | { value: Partial<row> }
-  | { issues: ReadonlyArray<ValidationIssue> }
+  | ValidationFailure
 
 export type TableAfterRead<row extends Record<string, unknown>> = (
   context: TableAfterReadContext<row>,
@@ -495,6 +499,48 @@ export type CreateTableOptions<
 let defaultTimestampConfig: TimestampConfig = {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
+}
+
+/**
+ * Creates a lifecycle/validation failure result with one or more issues.
+ * @param messageOrIssues Either a single issue message or an array of issues.
+ * @param path Optional issue path when passing a message.
+ * @returns A `{ issues }` result object for `validate` and lifecycle callbacks.
+ * @example
+ * ```ts
+ * import { column as c, fail, table } from 'remix/data-table'
+ *
+ * let users = table({
+ *   name: 'users',
+ *   columns: {
+ *     id: c.integer(),
+ *     email: c.varchar(255),
+ *   },
+ *   validate({ value }) {
+ *     if (!value.email) {
+ *       return fail('Email is required', ['email'])
+ *     }
+ *
+ *     return { value }
+ *   },
+ * })
+ * ```
+ */
+export function fail(message: string, path?: Array<string | number>): ValidationFailure
+export function fail(issues: ReadonlyArray<ValidationIssue>): ValidationFailure
+export function fail(
+  messageOrIssues: string | ReadonlyArray<ValidationIssue>,
+  path?: Array<string | number>,
+): ValidationFailure {
+  if (typeof messageOrIssues === 'string') {
+    return {
+      issues: [{ message: messageOrIssues, path }],
+    }
+  }
+
+  return {
+    issues: [...messageOrIssues],
+  }
 }
 
 /**

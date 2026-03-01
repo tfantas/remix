@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import { column } from './column.ts'
 import {
   columnMetadataKey,
+  fail,
   getTableAfterDelete,
   getTableAfterRead,
   getTableAfterWrite,
@@ -83,6 +84,25 @@ describe('table metadata', () => {
     assert.deepEqual(updateResult, { value: { id: 2 } })
 
     assert.deepEqual(calls, ['create', 'update'])
+  })
+
+  it('creates validation failure results with fail()', () => {
+    assert.deepEqual(fail('Expected email', ['email']), {
+      issues: [{ message: 'Expected email', path: ['email'] }],
+    })
+
+    assert.deepEqual(
+      fail([
+        { message: 'Missing id', path: ['id'] },
+        { message: 'Missing email', path: ['email'] },
+      ]),
+      {
+        issues: [
+          { message: 'Missing id', path: ['id'] },
+          { message: 'Missing email', path: ['email'] },
+        ],
+      },
+    )
   })
 
   it('stores optional lifecycle callbacks on table metadata', () => {
