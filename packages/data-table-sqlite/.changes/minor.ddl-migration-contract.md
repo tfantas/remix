@@ -1,1 +1,5 @@
-BREAKING CHANGE: Update the sqlite adapter to the split DML/DDL contract (`execute` for `DataManipulationOperation`, `migrate` for `DataMigrationOperation`), rename request payload field `statement` to `operation`, move SQL compilation to the shared internal operation compiler from `@remix-run/data-table`, and keep adapter-level DDL execution support for migrations.
+BREAKING CHANGE: Update the sqlite adapter to the split DML/DDL contract (`execute` for `DataManipulationOperation`, `migrate` for `DataMigrationOperation`), rename request payload field `statement` to `operation`, align compiler/runtime naming around operations, and keep adapter-level DDL execution support for migrations.
+
+BREAKING CHANGE: SQLite migration execution now reports `affectedOperations` (via `DataMigrationResult`) instead of `affectedObjects`.
+
+BREAKING CHANGE: SQL compilation remains adapter-owned while sharing common helpers from `remix/data-table/sql-helpers`.
