@@ -33,7 +33,6 @@
     "./data-table-mysql": "./src/data-table-mysql.ts",
     "./data-table-postgres": "./src/data-table-postgres.ts",
     "./data-table-sqlite": "./src/data-table-sqlite.ts",
-    "./data-table/internal/sql-compiler": "./src/data-table/internal/sql-compiler.ts",
     "./data-table/migrations": "./src/data-table/migrations.ts",
     "./data-table/migrations/node": "./src/data-table/migrations/node.ts",
     "./data-table/operators": "./src/data-table/operators.ts",
@@ -141,10 +140,6 @@
       "./data-table-sqlite": {
         "types": "./dist/data-table-sqlite.d.ts",
         "default": "./dist/data-table-sqlite.js"
-      },
-      "./data-table/internal/sql-compiler": {
-        "types": "./dist/data-table/internal/sql-compiler.d.ts",
-        "default": "./dist/data-table/internal/sql-compiler.js"
       },
       "./data-table/migrations": {
         "types": "./dist/data-table/migrations.d.ts",
