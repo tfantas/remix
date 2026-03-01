@@ -358,12 +358,16 @@ let users = table({
 })
 
 export default createMigration({
-  async up({ db }) {
-    await db.createTable(users)
-    await db.createIndex(users, 'email', { unique: true })
+  async up({ db, schema, dialect }) {
+    await schema.createTable(users)
+    await schema.createIndex(users, 'email', { unique: true })
+
+    if (dialect === 'sqlite') {
+      await db.exec('pragma foreign_keys = on')
+    }
   },
-  async down({ db }) {
-    await db.dropTable(users, { ifExists: true })
+  async down({ schema }) {
+    await schema.dropTable(users, { ifExists: true })
   },
 })
 ```
@@ -432,20 +436,20 @@ let dryRunResult = await runner.up({ dryRun: true })
 console.log(dryRunResult.sql)
 ```
 
-When migration transactions are enabled, migration-time `db.createTable(...)`, `db.exec(...)`,
-query-builder data operations, and `db.hasTable(...)` / `db.hasColumn(...)` all run in the same
+When migration transactions are enabled, migration-time `schema.createTable(...)`, `db.exec(...)`,
+query-builder data operations, and `schema.hasTable(...)` / `schema.hasColumn(...)` all run in the same
 adapter transaction context.
 
-You can also pass a pre-built SQL statement into `db.plan(...)` when authoring migrations:
+You can also pass a pre-built SQL statement into `schema.plan(...)` when authoring migrations:
 
 ```ts
 import { sql } from 'remix/data-table'
 
-await db.plan(sql`update users set status = ${'active'} where status is null`)
+await schema.plan(sql`update users set status = ${'active'} where status is null`)
 ```
 
-You can run lightweight schema checks inside a migration with `db.hasTable(...)` and
-`db.hasColumn(...)` when you need defensive conditional behavior. Methods that take a table name
+You can run lightweight schema checks inside a migration with `schema.hasTable(...)` and
+`schema.hasColumn(...)` when you need defensive conditional behavior. Methods that take a table name
 accept either a string (`'app.users'`) or a `table(...)` object.
 
 In `dryRun` mode, introspection methods still check the live database state. They do not simulate
@@ -454,7 +458,7 @@ tables/columns from pending operations in the current dry-run plan.
 For key-oriented migration APIs, single-column and compound forms are both supported:
 
 ```ts
-await db.alterTable(users, (table) => {
+await schema.alterTable(users, (table) => {
   table.addPrimaryKey('id')
   table.addForeignKey('account_id', 'accounts', 'id')
   table.addForeignKey(['tenant_id', 'account_id'], 'accounts', [

@@ -436,11 +436,11 @@ export function runAdapterIntegrationContract(options: IntegrationContractOption
         },
       })
       let migration = createMigration({
-        async up({ db }) {
-          await db.createTable(lifecycleAccounts, { ifNotExists: true })
+        async up({ schema }) {
+          await schema.createTable(lifecycleAccounts, { ifNotExists: true })
         },
-        async down({ db }) {
-          await db.dropTable('lifecycle_accounts', { ifExists: true })
+        async down({ schema }) {
+          await schema.dropTable('lifecycle_accounts', { ifExists: true })
         },
       })
       let runner = createMigrationRunner(

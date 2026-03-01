@@ -2,7 +2,7 @@ import { column as c, createMigration } from 'remix/data-table/migrations'
 import { table } from 'remix/data-table'
 
 export default createMigration({
-  async up({ db }) {
+  async up({ schema }) {
     let books = table({
       name: 'books',
       columns: {
@@ -20,7 +20,7 @@ export default createMigration({
         in_stock: c.boolean().notNull(),
       },
     })
-    await db.createTable(books)
+    await schema.createTable(books)
 
     let users = table({
       name: 'users',
@@ -33,7 +33,7 @@ export default createMigration({
         created_at: c.integer().notNull(),
       },
     })
-    await db.createTable(users)
+    await schema.createTable(users)
 
     let orders = table({
       name: 'orders',
@@ -50,8 +50,8 @@ export default createMigration({
         created_at: c.integer().notNull(),
       },
     })
-    await db.createTable(orders)
-    await db.createIndex('orders', 'user_id', { name: 'orders_user_id_idx' })
+    await schema.createTable(orders)
+    await schema.createIndex('orders', 'user_id', { name: 'orders_user_id_idx' })
 
     let orderItems = table({
       name: 'order_items',
@@ -72,9 +72,9 @@ export default createMigration({
         quantity: c.integer().notNull(),
       },
     })
-    await db.createTable(orderItems)
-    await db.createIndex('order_items', 'order_id', { name: 'order_items_order_id_idx' })
-    await db.createIndex('order_items', 'book_id', { name: 'order_items_book_id_idx' })
+    await schema.createTable(orderItems)
+    await schema.createIndex('order_items', 'order_id', { name: 'order_items_order_id_idx' })
+    await schema.createIndex('order_items', 'book_id', { name: 'order_items_book_id_idx' })
 
     let passwordResetTokens = table({
       name: 'password_reset_tokens',
@@ -89,14 +89,14 @@ export default createMigration({
         expires_at: c.integer().notNull(),
       },
     })
-    await db.createTable(passwordResetTokens)
-    await db.createIndex('password_reset_tokens', 'user_id', { name: 'password_reset_tokens_user_id_idx' })
+    await schema.createTable(passwordResetTokens)
+    await schema.createIndex('password_reset_tokens', 'user_id', { name: 'password_reset_tokens_user_id_idx' })
   },
-  async down({ db }) {
-    await db.dropTable('password_reset_tokens', { ifExists: true })
-    await db.dropTable('order_items', { ifExists: true })
-    await db.dropTable('orders', { ifExists: true })
-    await db.dropTable('users', { ifExists: true })
-    await db.dropTable('books', { ifExists: true })
+  async down({ schema }) {
+    await schema.dropTable('password_reset_tokens', { ifExists: true })
+    await schema.dropTable('order_items', { ifExists: true })
+    await schema.dropTable('orders', { ifExists: true })
+    await schema.dropTable('users', { ifExists: true })
+    await schema.dropTable('books', { ifExists: true })
   },
 })
