@@ -432,6 +432,10 @@ let dryRunResult = await runner.up({ dryRun: true })
 console.log(dryRunResult.sql)
 ```
 
+When migration transactions are enabled, migration-time `db.createTable(...)`, `db.exec(...)`,
+query-builder data operations, and `db.hasTable(...)` / `db.hasColumn(...)` all run in the same
+adapter transaction context.
+
 You can also pass a pre-built SQL statement into `db.plan(...)` when authoring migrations:
 
 ```ts
@@ -443,6 +447,9 @@ await db.plan(sql`update users set status = ${'active'} where status is null`)
 You can run lightweight schema checks inside a migration with `db.hasTable(...)` and
 `db.hasColumn(...)` when you need defensive conditional behavior. Methods that take a table name
 accept either a string (`'app.users'`) or a `table(...)` object.
+
+In `dryRun` mode, introspection methods still check the live database state. They do not simulate
+tables/columns from pending operations in the current dry-run plan.
 
 For key-oriented migration APIs, single-column and compound forms are both supported:
 

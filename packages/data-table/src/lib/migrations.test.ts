@@ -41,6 +41,10 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   journalRows: JournalRow[] = []
   migratedOperations: DataMigrationOperation[] = []
   executedRawSql: SqlStatement[] = []
+  executeTransactionIds: Array<string | undefined> = []
+  migrateTransactionIds: Array<string | undefined> = []
+  hasTableTransactionIds: Array<string | undefined> = []
+  hasColumnTransactionIds: Array<string | undefined> = []
   knownTables = new Map<string, Set<string>>()
   lockAcquireCount = 0
   lockReleaseCount = 0
@@ -56,6 +60,12 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   }
 
   async execute(request: DataManipulationRequest): Promise<DataManipulationResult> {
+    this.executeTransactionIds.push(request.transaction?.id)
+
+    if (request.transaction) {
+      this.#assertToken(request.transaction)
+    }
+
     if (request.operation.kind !== 'raw') {
       throw new Error('MemoryMigrationAdapter only supports raw execute operations')
     }
@@ -116,6 +126,12 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
   }
 
   async migrate(request: DataMigrationRequest): Promise<DataMigrationResult> {
+    this.migrateTransactionIds.push(request.transaction?.id)
+
+    if (request.transaction) {
+      this.#assertToken(request.transaction)
+    }
+
     let operation = request.operation
 
     if (
@@ -176,11 +192,23 @@ class MemoryMigrationAdapter implements DatabaseAdapter {
     return { affectedOperations: 1 }
   }
 
-  async hasTable(table: TableRef): Promise<boolean> {
+  async hasTable(table: TableRef, transaction?: TransactionToken): Promise<boolean> {
+    this.hasTableTransactionIds.push(transaction?.id)
+
+    if (transaction) {
+      this.#assertToken(transaction)
+    }
+
     return this.knownTables.has(tableRefKey(table))
   }
 
-  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+  async hasColumn(table: TableRef, column: string, transaction?: TransactionToken): Promise<boolean> {
+    this.hasColumnTransactionIds.push(transaction?.id)
+
+    if (transaction) {
+      this.#assertToken(transaction)
+    }
+
     let columns = this.knownTables.get(tableRefKey(table))
     return columns?.has(column) === true
   }
@@ -960,15 +988,59 @@ describe('migration runner', () => {
     assert.deepEqual(addForeignKeyOperation.constraint.references.columns, ['id'])
   })
 
-  it('returns false for table and column checks when dryRun database blocks execution', async () => {
+  it('uses the same transaction token for migrate, exec, and introspection', async () => {
     let adapter = new MemoryMigrationAdapter()
     let migration = createMigration({
+      transaction: 'required',
       async up({ db }) {
-        let tableExists = await db.hasTable('app.users')
-        let columnExists = await db.hasColumn('app.users', 'email')
+        await db.createTable(createIdTable('users'))
+        await db.exec(rawSql('select 1'))
+        await db.hasTable('users')
+        await db.hasColumn('users', 'id')
+      },
+      async down() {},
+    })
 
-        if (tableExists || columnExists) {
-          throw new Error('Expected false for dry-run schema introspection')
+    let runner = createMigrationRunner(adapter, [{ id: '20260101000000', name: 'tx_scope', migration }])
+    await runner.up()
+
+    assert.equal(adapter.beginTransactionCount, 1)
+    assert.equal(adapter.commitTransactionCount, 1)
+    assert.equal(adapter.rollbackTransactionCount, 0)
+
+    let migrateTokenIds = adapter.migrateTransactionIds.filter((id) => id !== undefined)
+    assert.ok(migrateTokenIds.length > 0)
+    assert.ok(migrateTokenIds.every((id) => id === migrateTokenIds[0]))
+
+    let executeTokenIds = adapter.executeTransactionIds.filter((id) => id !== undefined)
+    assert.ok(executeTokenIds.length > 0)
+    assert.ok(executeTokenIds.every((id) => id === migrateTokenIds[0]))
+
+    let hasTableTokenIds = adapter.hasTableTransactionIds.filter((id) => id !== undefined)
+    assert.ok(hasTableTokenIds.length > 0)
+    assert.ok(hasTableTokenIds.every((id) => id === migrateTokenIds[0]))
+
+    let hasColumnTokenIds = adapter.hasColumnTransactionIds.filter((id) => id !== undefined)
+    assert.ok(hasColumnTokenIds.length > 0)
+    assert.ok(hasColumnTokenIds.every((id) => id === migrateTokenIds[0]))
+  })
+
+  it('uses live adapter introspection during dryRun without simulating planned operations', async () => {
+    let adapter = new MemoryMigrationAdapter()
+    adapter.knownTables.set('app.users', new Set(['email']))
+
+    let migration = createMigration({
+      async up({ db }) {
+        let existingTable = await db.hasTable('app.users')
+        let existingColumn = await db.hasColumn('app.users', 'email')
+        let plannedTableBefore = await db.hasTable('app.pending')
+
+        await db.createTable(createIdTable('app.pending'))
+
+        let plannedTableAfter = await db.hasTable('app.pending')
+
+        if (!existingTable || !existingColumn || plannedTableBefore || plannedTableAfter) {
+          throw new Error('Unexpected dry-run introspection behavior')
         }
       },
       async down() {},

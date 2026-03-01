@@ -102,6 +102,53 @@ describe('mysql adapter', () => {
     assert.deepEqual(statements[1]?.values, ['users', 'email'])
   })
 
+  it('routes introspection through transaction connections when a token is provided', async () => {
+    let rootQueries = 0
+    let connectionStatements: string[] = []
+
+    let connection = {
+      async query(text: string) {
+        connectionStatements.push(text)
+        return [[{ exists: 1 }], []]
+      },
+      async beginTransaction() {
+        connectionStatements.push('begin')
+      },
+      async commit() {
+        connectionStatements.push('commit')
+      },
+      async rollback() {
+        connectionStatements.push('rollback')
+      },
+      release() {},
+    }
+
+    let pool = {
+      async query() {
+        rootQueries += 1
+        return [[], []]
+      },
+      async getConnection() {
+        return connection
+      },
+    }
+
+    let adapter = createMysqlDatabaseAdapter(pool as never)
+    let token = await adapter.beginTransaction()
+
+    await adapter.hasTable({ name: 'users' }, token)
+    await adapter.hasColumn({ name: 'users' }, 'email', token)
+    await adapter.commitTransaction(token)
+
+    assert.equal(rootQueries, 0)
+    assert.deepEqual(connectionStatements, [
+      'begin',
+      'select exists(select 1 from information_schema.tables where table_schema = database() and table_name = ?) as `exists`',
+      'select exists(select 1 from information_schema.columns where table_schema = database() and table_name = ? and column_name = ?) as `exists`',
+      'commit',
+    ])
+  })
+
   it('short-circuits insertMany([]) and returns empty rows for returning queries', async () => {
     let calls = 0
 

@@ -111,6 +111,56 @@ describe('postgres adapter', () => {
     assert.equal(statements[1]?.values?.[1], 'email')
   })
 
+  it('routes introspection through transaction clients when a token is provided', async () => {
+    let poolQueries = 0
+    let transactionStatements: string[] = []
+
+    let transactionClient = {
+      async query(text: string) {
+        transactionStatements.push(text)
+        return {
+          rows: [{ exists: true }],
+          rowCount: 1,
+          command: 'SELECT',
+          oid: 0,
+          fields: [],
+        }
+      },
+      release() {},
+    }
+
+    let pool = {
+      async query() {
+        poolQueries += 1
+        return {
+          rows: [],
+          rowCount: 0,
+          command: 'SELECT',
+          oid: 0,
+          fields: [],
+        }
+      },
+      async connect() {
+        return transactionClient
+      },
+    }
+
+    let adapter = createPostgresDatabaseAdapter(pool as never)
+    let token = await adapter.beginTransaction()
+
+    await adapter.hasTable({ name: 'users' }, token)
+    await adapter.hasColumn({ name: 'users' }, 'email', token)
+    await adapter.commitTransaction(token)
+
+    assert.equal(poolQueries, 0)
+    assert.deepEqual(transactionStatements, [
+      'begin',
+      'select to_regclass($1) is not null as "exists"',
+      'select exists (select 1 from pg_attribute where attrelid = to_regclass($1) and attname = $2 and attnum > 0 and not attisdropped) as "exists"',
+      'commit',
+    ])
+  })
+
   it('short-circuits insertMany([]) and returns empty rows for returning queries', async () => {
     let calls = 0
 

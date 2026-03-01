@@ -1,4 +1,4 @@
-import { createDatabase } from '../database.ts'
+import { createDatabase, createDatabaseWithTransaction } from '../database.ts'
 import type { Database as DataManipulationDatabase } from '../database.ts'
 import type { DatabaseAdapter, TransactionToken } from '../adapter.ts'
 import type { SqlStatement } from '../sql.ts'
@@ -102,11 +102,11 @@ function createDryRunDatabase(adapter: DatabaseAdapter): DataManipulationDatabas
     compileSql(operation) {
       return adapter.compileSql(operation)
     },
-    async hasTable() {
-      return false
+    async hasTable(table) {
+      return adapter.hasTable(table)
     },
-    async hasColumn() {
-      return false
+    async hasColumn(table, column) {
+      return adapter.hasColumn(table, column)
     },
     execute: throwDryRunError,
     migrate: throwDryRunError,
@@ -199,11 +199,16 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
         migration.migration.transaction !== 'none' &&
         adapter.capabilities.transactionalDdl
       let token: TransactionToken | undefined
-      let db = dryRun ? createDryRunDatabase(adapter) : createDatabase(adapter)
 
       if (shouldUseTransaction) {
         token = await adapter.beginTransaction()
       }
+
+      let db = dryRun
+        ? createDryRunDatabase(adapter)
+        : token
+          ? createDatabaseWithTransaction(adapter, token)
+          : createDatabase(adapter)
 
       let migrationOperations = createSchemaApi(db, async (operation) => {
         let compiled = adapter.compileSql(operation)
@@ -212,7 +217,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
         if (!dryRun) {
           await adapter.migrate({ operation, transaction: token })
         }
-      })
+      }, { transaction: token })
       let migrationDb: MigrationsDatabase = Object.assign(db, migrationOperations)
 
       let context: MigrationContext = {

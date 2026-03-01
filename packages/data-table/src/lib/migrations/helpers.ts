@@ -72,7 +72,7 @@ function columnsNamePart(columns: string[]): string {
   return columns.map((column) => normalizeNamePart(column)).join('_')
 }
 
-export function createPrimaryKeyName(table: TableRef, _columns: string[]): string {
+export function createPrimaryKeyName(table: TableRef): string {
   return withNameLimit(tableNamePart(table) + '_pk')
 }
 

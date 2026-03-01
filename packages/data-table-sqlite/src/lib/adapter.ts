@@ -113,7 +113,11 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  async hasTable(table: TableRef): Promise<boolean> {
+  async hasTable(table: TableRef, transaction?: TransactionToken): Promise<boolean> {
+    if (transaction) {
+      this.#assertTransaction(transaction)
+    }
+
     let masterTable = table.schema ? quoteIdentifier(table.schema) + '.sqlite_master' : 'sqlite_master'
     let statement = this.#database.prepare(
       'select 1 from ' + masterTable + ' where type = ? and name = ? limit 1',
@@ -122,7 +126,15 @@ export class SqliteDatabaseAdapter implements DatabaseAdapter {
     return row !== undefined
   }
 
-  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+  async hasColumn(
+    table: TableRef,
+    column: string,
+    transaction?: TransactionToken,
+  ): Promise<boolean> {
+    if (transaction) {
+      this.#assertTransaction(transaction)
+    }
+
     let schemaPrefix = table.schema ? quoteIdentifier(table.schema) + '.' : ''
     let statement = this.#database.prepare(
       'pragma ' + schemaPrefix + 'table_info(' + quoteIdentifier(table.name) + ')',

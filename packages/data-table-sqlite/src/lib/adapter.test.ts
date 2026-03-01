@@ -202,6 +202,14 @@ describe('sqlite adapter', { skip: !sqliteAvailable }, () => {
       () => adapter.createSavepoint({ id: 'tx_missing' }, 'sp'),
       /Unknown transaction token: tx_missing/,
     )
+    await assert.rejects(
+      () => adapter.hasTable({ name: 'users' }, { id: 'tx_missing' }),
+      /Unknown transaction token: tx_missing/,
+    )
+    await assert.rejects(
+      () => adapter.hasColumn({ name: 'users' }, 'email', { id: 'tx_missing' }),
+      /Unknown transaction token: tx_missing/,
+    )
   })
 
   it('normalizes non-object rows and count values in reader mode', async () => {

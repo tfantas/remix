@@ -149,13 +149,14 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  async hasTable(table: TableRef): Promise<boolean> {
+  async hasTable(table: TableRef, transaction?: TransactionToken): Promise<boolean> {
     let schema = table.schema
     let sql = schema
       ? 'select exists(select 1 from information_schema.tables where table_schema = ? and table_name = ?) as `exists`'
       : 'select exists(select 1 from information_schema.tables where table_schema = database() and table_name = ?) as `exists`'
     let values = schema ? [schema, table.name] : [table.name]
-    let [result] = await this.#client.query(sql, values)
+    let client = this.#resolveClient(transaction)
+    let [result] = await client.query(sql, values)
 
     if (!isRowsResult(result)) {
       return false
@@ -164,13 +165,18 @@ export class MysqlDatabaseAdapter implements DatabaseAdapter {
     return toBooleanExists(result[0]?.exists)
   }
 
-  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+  async hasColumn(
+    table: TableRef,
+    column: string,
+    transaction?: TransactionToken,
+  ): Promise<boolean> {
     let schema = table.schema
     let sql = schema
       ? 'select exists(select 1 from information_schema.columns where table_schema = ? and table_name = ? and column_name = ?) as `exists`'
       : 'select exists(select 1 from information_schema.columns where table_schema = database() and table_name = ? and column_name = ?) as `exists`'
     let values = schema ? [schema, table.name, column] : [table.name, column]
-    let [result] = await this.#client.query(sql, values)
+    let client = this.#resolveClient(transaction)
+    let [result] = await client.query(sql, values)
 
     if (!isRowsResult(result)) {
       return false

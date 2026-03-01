@@ -140,16 +140,22 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     }
   }
 
-  async hasTable(table: TableRef): Promise<boolean> {
+  async hasTable(table: TableRef, transaction?: TransactionToken): Promise<boolean> {
     let relation = toPostgresRelationName(table)
-    let result = await this.#client.query('select to_regclass($1) is not null as "exists"', [relation])
+    let client = this.#resolveClient(transaction)
+    let result = await client.query('select to_regclass($1) is not null as "exists"', [relation])
     let row = result.rows[0] as Record<string, unknown> | undefined
     return toBooleanExists(row?.exists)
   }
 
-  async hasColumn(table: TableRef, column: string): Promise<boolean> {
+  async hasColumn(
+    table: TableRef,
+    column: string,
+    transaction?: TransactionToken,
+  ): Promise<boolean> {
     let relation = toPostgresRelationName(table)
-    let result = await this.#client.query(
+    let client = this.#resolveClient(transaction)
+    let result = await client.query(
       'select exists (select 1 from pg_attribute where attrelid = to_regclass($1) and attname = $2 and attnum > 0 and not attisdropped) as "exists"',
       [relation, column],
     )

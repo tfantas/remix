@@ -859,6 +859,30 @@ export function createDatabase(
 }
 
 /**
+ * Creates a database runtime bound to an existing adapter transaction token.
+ * This is an internal helper used by the migration runner.
+ * @param adapter Adapter implementation responsible for SQL execution.
+ * @param token Active adapter transaction token.
+ * @param options Optional runtime options.
+ * @param options.now Clock function used for auto-managed timestamps.
+ * @returns A `Database` API instance bound to the provided transaction.
+ */
+export function createDatabaseWithTransaction(
+  adapter: DatabaseAdapter,
+  token: TransactionToken,
+  options?: { now?: () => unknown },
+): Database {
+  let now = options?.now ?? defaultNow
+
+  return new DatabaseRuntime({
+    adapter,
+    token,
+    now,
+    savepointCounter: { value: 0 },
+  })
+}
+
+/**
  * Immutable query builder used by `db.query(table)`.
  */
 export class QueryBuilder<

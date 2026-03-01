@@ -8,6 +8,7 @@ import type {
   ForeignKeyConstraint,
   PrimaryKeyConstraint,
   TableRef,
+  TransactionToken,
   UniqueConstraint,
 } from '../adapter.ts'
 import { rawSql } from '../sql.ts'
@@ -125,7 +126,7 @@ function lowerTableForCreate(table: AnyTable): CreateTableOperation {
   if (primaryKeyColumns.length > 0) {
     primaryKey = {
       columns: primaryKeyColumns,
-      name: createPrimaryKeyName(tableRef, primaryKeyColumns),
+      name: createPrimaryKeyName(tableRef),
     }
   }
 
@@ -175,7 +176,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
       kind: 'addPrimaryKey',
       constraint: {
         columns: normalizedColumns,
-        name: options?.name ?? createPrimaryKeyName(this.table, normalizedColumns),
+        name: options?.name ?? createPrimaryKeyName(this.table),
       },
     })
   }
@@ -277,6 +278,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 export function createSchemaApi(
   db: Database,
   emit: (operation: DataMigrationOperation) => Promise<void>,
+  options?: { transaction?: TransactionToken },
 ): MigrationOperations {
   return {
     async createTable(table, options) {
@@ -399,10 +401,10 @@ export function createSchemaApi(
       })
     },
     async hasTable(table) {
-      return db.adapter.hasTable(asTableRef(table))
+      return db.adapter.hasTable(asTableRef(table), options?.transaction)
     },
     async hasColumn(table, columnName) {
-      return db.adapter.hasColumn(asTableRef(table), columnName)
+      return db.adapter.hasColumn(asTableRef(table), columnName, options?.transaction)
     },
   }
 }
