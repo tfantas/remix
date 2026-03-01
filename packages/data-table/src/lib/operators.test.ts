@@ -22,16 +22,16 @@ import {
   notNull,
   or,
 } from './operators.ts'
-import { createTable } from './table.ts'
+import { table } from './table.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
   },
 })
 
-let projects = createTable({
+let projects = table({
   name: 'projects',
   columns: {
     id: number(),
@@ -39,7 +39,7 @@ let projects = createTable({
   },
 })
 
-let invoices = createTable({
+let invoices = table({
   name: 'billing.invoices',
   columns: {
     id: number(),

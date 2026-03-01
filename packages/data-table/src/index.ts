@@ -105,7 +105,6 @@ export type {
 export {
   belongsTo,
   columnMetadataKey,
-  createTable,
   getTableColumns,
   getTableName,
   getTablePrimaryKey,
@@ -114,6 +113,7 @@ export {
   hasMany,
   hasManyThrough,
   hasOne,
+  table,
   tableMetadataKey,
   timestampSchema,
   timestamps,

@@ -5,6 +5,7 @@ import type {
   MigrateOptions,
   MigrateResult,
   MigrationContext,
+  MigrationDatabase,
   MigrationDescriptor,
   MigrationDirection,
   MigrationJournalRow,
@@ -190,7 +191,7 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
         token = await adapter.beginTransaction()
       }
 
-      let schema = createSchemaApi(db, async (operation) => {
+      let migrationOperations = createSchemaApi(db, async (operation) => {
         let compiled = adapter.compileSql(operation)
         sql.push(...compiled)
 
@@ -198,11 +199,11 @@ async function runMigrations(input: RunMigrationsInput): Promise<MigrateResult> 
           await adapter.migrate({ operation, transaction: token })
         }
       })
+      let migrationDb: MigrationDatabase = Object.assign(db, migrationOperations)
 
       let context: MigrationContext = {
         dialect: adapter.dialect,
-        schema,
-        db,
+        db: migrationDb,
       }
 
       try {

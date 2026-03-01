@@ -3,11 +3,11 @@ import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
 import Database from 'better-sqlite3'
 import type { DataMigrationOperation } from '@remix-run/data-table'
-import { createDatabase, createTable, eq } from '@remix-run/data-table'
+import { createDatabase, table, eq } from '@remix-run/data-table'
 
 import { createSqliteDatabaseAdapter } from './adapter.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -16,7 +16,7 @@ let accounts = createTable({
   },
 })
 
-let projects = createTable({
+let projects = table({
   name: 'projects',
   columns: {
     id: number(),
@@ -25,7 +25,7 @@ let projects = createTable({
   },
 })
 
-let accountProjects = createTable({
+let accountProjects = table({
   name: 'account_projects',
   columns: {
     account_id: number(),

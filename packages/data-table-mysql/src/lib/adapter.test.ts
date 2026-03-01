@@ -2,11 +2,11 @@ import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
 import type { DataMigrationOperation } from '@remix-run/data-table'
-import { createDatabase, createTable, eq, ilike, inList } from '@remix-run/data-table'
+import { createDatabase, table, eq, ilike, inList } from '@remix-run/data-table'
 
 import { createMysqlDatabaseAdapter } from './adapter.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -14,7 +14,7 @@ let accounts = createTable({
   },
 })
 
-let projects = createTable({
+let projects = table({
   name: 'projects',
   columns: {
     id: number(),
@@ -23,7 +23,7 @@ let projects = createTable({
   },
 })
 
-let invoices = createTable({
+let invoices = table({
   name: 'billing.invoices',
   columns: {
     id: number(),
@@ -31,7 +31,7 @@ let invoices = createTable({
   },
 })
 
-let accountProjects = createTable({
+let accountProjects = table({
   name: 'account_projects',
   columns: {
     account_id: number(),

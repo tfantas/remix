@@ -21,7 +21,6 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./internal/sql-compiler": "./src/internal/sql-compiler.ts",
     "./migrations": "./src/migrations.ts",
     "./migrations/node": "./src/migrations/node.ts",
     "./operators": "./src/operators.ts",
@@ -34,10 +33,6 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
-      },
-      "./internal/sql-compiler": {
-        "types": "./dist/internal/sql-compiler.d.ts",
-        "default": "./dist/internal/sql-compiler.js"
       },
       "./migrations": {
         "types": "./dist/migrations.d.ts",
@@ -77,10 +72,9 @@
     "clean": "git clean -fdX",
     "prepublishOnly": "pnpm run build",
     "test": "node --disable-warning=ExperimentalWarning --test",
-    "test:coverage": "pnpm run test:coverage:core && pnpm run test:coverage:migrations && pnpm run test:coverage:sql-compiler",
+    "test:coverage": "pnpm run test:coverage:core && pnpm run test:coverage:migrations",
     "test:coverage:core": "node --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/lib/operators.ts' --test-coverage-include='src/lib/references.ts' --test-coverage-include='src/lib/inflection.ts' --test-coverage-include='src/lib/sql.ts' --test-coverage-include='src/lib/errors.ts' --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 --test ./src/lib/operators.test.ts ./src/lib/references.test.ts ./src/lib/inflection.test.ts ./src/lib/sql.test.ts ./src/lib/errors.test.ts",
     "test:coverage:migrations": "node --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/lib/migrations.ts' --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 --test ./src/lib/migrations.test.ts",
-    "test:coverage:sql-compiler": "node --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/lib/sql-compiler.ts' --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 --test ./src/lib/sql-compiler.test.ts",
     "typecheck": "tsgo --noEmit"
   },
   "keywords": [

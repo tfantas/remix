@@ -5,13 +5,13 @@ import { boolean, number, string } from '@remix-run/data-schema'
 import type { DataManipulationOperation, DatabaseAdapter } from './adapter.ts'
 import { createDatabase } from './database.ts'
 import { DataTableAdapterError, DataTableQueryError, DataTableValidationError } from './errors.ts'
-import { belongsTo, createTable, hasMany, hasManyThrough, hasOne, timestamps } from './table.ts'
+import { belongsTo, table, hasMany, hasManyThrough, hasOne, timestamps } from './table.ts'
 import { eq } from './operators.ts'
 import { sql } from './sql.ts'
 import type { SqliteTestAdapterOptions, SqliteTestSeed } from '../../test/sqlite-test-database.ts'
 import { createSqliteTestAdapter } from '../../test/sqlite-test-database.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -22,7 +22,7 @@ let accounts = createTable({
   timestamps: true,
 })
 
-let projects = createTable({
+let projects = table({
   name: 'projects',
   columns: {
     id: number(),
@@ -32,7 +32,7 @@ let projects = createTable({
   },
 })
 
-let profiles = createTable({
+let profiles = table({
   name: 'profiles',
   columns: {
     id: number(),
@@ -41,7 +41,7 @@ let profiles = createTable({
   },
 })
 
-let tasks = createTable({
+let tasks = table({
   name: 'tasks',
   columns: {
     id: number(),
@@ -51,7 +51,7 @@ let tasks = createTable({
   },
 })
 
-let memberships = createTable({
+let memberships = table({
   name: 'memberships',
   primaryKey: ['organization_id', 'account_id'],
   columns: {
@@ -61,7 +61,7 @@ let memberships = createTable({
   },
 })
 
-let invoices = createTable({
+let invoices = table({
   name: 'billing.invoices',
   columns: {
     id: number(),

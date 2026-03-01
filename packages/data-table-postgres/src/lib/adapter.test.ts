@@ -2,11 +2,11 @@ import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { number, string } from '@remix-run/data-schema'
 import type { DataMigrationOperation } from '@remix-run/data-table'
-import { createDatabase, createTable, eq, inList, sql } from '@remix-run/data-table'
+import { createDatabase, table, eq, inList, sql } from '@remix-run/data-table'
 
 import { createPostgresDatabaseAdapter } from './adapter.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -14,7 +14,7 @@ let accounts = createTable({
   },
 })
 
-let projects = createTable({
+let projects = table({
   name: 'projects',
   columns: {
     id: number(),
@@ -23,7 +23,7 @@ let projects = createTable({
   },
 })
 
-let invoices = createTable({
+let invoices = table({
   name: 'billing.invoices',
   columns: {
     id: number(),
@@ -31,7 +31,7 @@ let invoices = createTable({
   },
 })
 
-let accountProjects = createTable({
+let accountProjects = table({
   name: 'account_projects',
   columns: {
     account_id: number(),
@@ -722,7 +722,7 @@ describe('postgres adapter', () => {
     assert.deepEqual(statements[4].values, ['data_table_migrations'])
   })
 
-  it('compiles rich createTable migrations including literals, references, and comments', () => {
+  it('compiles rich table migrations including literals, references, and comments', () => {
     let adapter = createPostgresDatabaseAdapter({
       async query() {
         return {

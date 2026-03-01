@@ -3,22 +3,23 @@ export type {
   ColumnNamespace,
   CreateMigrationInput,
   CreateTableBuilder,
+  MigrationDatabase,
   Migration,
   MigrationContext,
   MigrationDescriptor,
   MigrationDirection,
   MigrationJournalRow,
-  MigrationPlan,
+  MigrationOperations,
   MigrationRegistry,
   MigrationRunner,
   MigrationRunnerOptions,
-  MigrationSchemaApi,
   MigrationStatus,
   MigrationStatusEntry,
   MigrationTransactionMode,
   MigrateOptions,
   MigrateResult,
 } from './lib/migrations.ts'
+export type { MigrationDatabase as Database } from './lib/migrations.ts'
 export {
   createMigration,
 } from './lib/migrations.ts'

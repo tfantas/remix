@@ -3,9 +3,9 @@ import { describe, it } from 'node:test'
 import { number } from '@remix-run/data-schema'
 
 import { isColumnReference, normalizeColumnInput } from './references.ts'
-import { createTable } from './table.ts'
+import { table } from './table.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),

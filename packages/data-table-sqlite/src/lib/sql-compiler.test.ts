@@ -4,7 +4,7 @@ import { boolean, number, string } from '@remix-run/data-schema'
 import {
   between,
   createDatabase,
-  createTable,
+  table,
   eq,
   gt,
   gte,
@@ -24,7 +24,7 @@ import {
 } from '@remix-run/data-table'
 import { compileSqliteStatement } from './sql-compiler.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -34,7 +34,7 @@ let accounts = createTable({
   },
 })
 
-let tasks = createTable({
+let tasks = table({
   name: 'tasks',
   columns: {
     id: number(),

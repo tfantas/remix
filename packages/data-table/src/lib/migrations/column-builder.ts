@@ -2,21 +2,8 @@ import type {
   ColumnDefinition,
   ForeignKeyAction,
   IdentityOptions,
-  TableRef,
 } from '../adapter.ts'
-
-function toTableRef(name: string): TableRef {
-  let segments = name.split('.')
-
-  if (segments.length === 1) {
-    return { name }
-  }
-
-  return {
-    schema: segments[0],
-    name: segments.slice(1).join('.'),
-  }
-}
+import { toTableRef } from './helpers.ts'
 
 export class ColumnBuilder {
   #definition: ColumnDefinition

@@ -385,7 +385,7 @@ export function validatePartialRow<table extends AnyTable>(
  * @param options Table declaration options.
  * @returns A frozen table object.
  */
-export function createTable<
+export function table<
   name extends string,
   columns extends ColumnSchemas,
   primaryKey extends

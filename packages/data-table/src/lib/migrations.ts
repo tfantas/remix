@@ -1,7 +1,6 @@
 import type { Database } from './database.ts'
 import type {
   ColumnDefinition,
-  DataMigrationOperation,
   ForeignKeyAction,
   IndexDefinition,
 } from './adapter.ts'
@@ -9,10 +8,11 @@ import type { ColumnBuilder } from './migrations/column-builder.ts'
 
 export type MigrationTransactionMode = 'auto' | 'required' | 'none'
 
+export type MigrationDatabase = Database & MigrationOperations
+
 export type MigrationContext = {
   dialect: string
-  schema: MigrationSchemaApi
-  db: Database
+  db: MigrationDatabase
 }
 
 export type CreateMigrationInput = {
@@ -44,13 +44,6 @@ export type MigrationDescriptor = {
 }
 
 export type MigrationDirection = 'up' | 'down'
-
-export type MigrationPlan = {
-  migration: MigrationDescriptor
-  direction: MigrationDirection
-  transaction: MigrationTransactionMode
-  statements: DataMigrationOperation[]
-}
 
 export type MigrationJournalRow = {
   id: string
@@ -150,7 +143,7 @@ export interface AlterTableBuilder {
   comment(text: string): void
 }
 
-export interface MigrationSchemaApi {
+export interface MigrationOperations {
   createTable(
     name: string,
     migrate: (table: CreateTableBuilder) => void,
@@ -198,11 +191,4 @@ export type MigrationRunner = {
   up(options?: MigrateOptions): Promise<MigrateResult>
   down(options?: MigrateOptions): Promise<MigrateResult>
   status(): Promise<MigrationStatusEntry[]>
-}
-
-export type MigrationFileInfo = {
-  id: string
-  name: string
-  path: string
-  checksum: string
 }

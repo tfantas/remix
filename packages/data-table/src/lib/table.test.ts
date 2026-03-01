@@ -4,7 +4,7 @@ import { number, parseSafe, string } from '@remix-run/data-schema'
 
 import {
   columnMetadataKey,
-  createTable,
+  table,
   getTableName,
   getTablePrimaryKey,
   getTableReference,
@@ -14,7 +14,7 @@ import {
 
 describe('table metadata', () => {
   it('stores table internals on a symbol key and exposes column refs as properties', () => {
-    let users = createTable({
+    let users = table({
       name: 'users',
       columns: {
         id: number(),
@@ -35,7 +35,7 @@ describe('table metadata', () => {
   })
 
   it('is standard-schema compatible with create-style validation semantics', () => {
-    let users = createTable({
+    let users = table({
       name: 'users',
       columns: {
         id: number(),
@@ -67,13 +67,13 @@ describe('table metadata', () => {
   })
 
   it('builds relations with functional helpers', () => {
-    let users = createTable({
+    let users = table({
       name: 'users',
       columns: {
         id: number(),
       },
     })
-    let orders = createTable({
+    let orders = table({
       name: 'orders',
       columns: {
         id: number(),

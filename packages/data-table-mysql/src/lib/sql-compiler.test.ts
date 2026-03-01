@@ -5,7 +5,7 @@ import {
   and,
   between,
   createDatabase,
-  createTable,
+  table,
   eq,
   gt,
   gte,
@@ -24,7 +24,7 @@ import {
 
 import { compileMysqlStatement } from './sql-compiler.ts'
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -34,7 +34,7 @@ let accounts = createTable({
   },
 })
 
-let tasks = createTable({
+let tasks = table({
   name: 'tasks',
   columns: {
     id: number(),

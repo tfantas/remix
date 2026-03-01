@@ -37,10 +37,10 @@ Define tables once, then create a database with an adapter.
 ```ts
 import { Pool } from 'pg'
 import * as s from 'remix/data-schema'
-import { createDatabase, createTable, hasMany } from 'remix/data-table'
+import { createDatabase, table, hasMany } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table-postgres'
 
-let users = createTable({
+let users = table({
   name: 'users',
   columns: {
     id: s.string(),
@@ -50,7 +50,7 @@ let users = createTable({
   },
 })
 
-let orders = createTable({
+let orders = table({
   name: 'orders',
   columns: {
     id: s.string(),
@@ -282,7 +282,7 @@ await db.transaction(async (tx) => {
 
 `data-table` includes a first-class migration system under `remix/data-table/migrations`.
 Migrations are adapter-driven: adapters execute SQL for their dialect/runtime, and SQL compilation
-is handled by adapter-owned compilers (with optional shared pure helpers from `data-table` internals).
+is handled by adapter-owned compilers (with optional shared pure helpers from `data-table`).
 For adapter authors (including third-party adapters), shared SQL helper utilities are available at
 `remix/data-table/sql-helpers`.
 
@@ -307,16 +307,16 @@ app/
 import { createMigration, column as c } from 'remix/data-table/migrations'
 
 export default createMigration({
-  async up({ schema }) {
-    await schema.createTable('users', (table) => {
+  async up({ db }) {
+    await db.createTable('users', (table) => {
       table.addColumn('id', c.integer().primaryKey())
       table.addColumn('email', c.varchar(255).notNull().unique())
       table.addColumn('created_at', c.timestamp({ withTimezone: true }).defaultNow())
       table.addIndex('users_email_idx', 'email', { unique: true })
     })
   },
-  async down({ schema }) {
-    await schema.dropTable('users', { ifExists: true })
+  async down({ db }) {
+    await db.dropTable('users', { ifExists: true })
   },
 })
 ```

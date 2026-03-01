@@ -9,7 +9,7 @@ import type {
   QueryForTable,
   WriteResult,
 } from './database.ts'
-import { createTable, hasMany } from './table.ts'
+import { table, hasMany } from './table.ts'
 import type { TableReference } from './table.ts'
 import { eq } from './operators.ts'
 import type { SqliteTestSeed } from '../../test/sqlite-test-database.ts'
@@ -22,7 +22,7 @@ type Equal<left, right> =
 
 function expectType<condition extends true>(): void {}
 
-let accounts = createTable({
+let accounts = table({
   name: 'accounts',
   columns: {
     id: number(),
@@ -31,7 +31,7 @@ let accounts = createTable({
   },
 })
 
-let projects = createTable({
+let projects = table({
   name: 'projects',
   columns: {
     id: number(),

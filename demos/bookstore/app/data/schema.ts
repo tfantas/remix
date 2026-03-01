@@ -1,9 +1,9 @@
 import * as s from 'remix/data-schema'
 import * as coerce from 'remix/data-schema/coerce'
-import { belongsTo, createTable, hasMany } from 'remix/data-table'
+import { belongsTo, table, hasMany } from 'remix/data-table'
 import type { TableRow, TableRowWith } from 'remix/data-table'
 
-export const books = createTable({
+export const books = table({
   name: 'books',
   columns: {
     id: coerce.number(),
@@ -21,7 +21,7 @@ export const books = createTable({
   },
 })
 
-export const users = createTable({
+export const users = table({
   name: 'users',
   columns: {
     id: coerce.number(),
@@ -33,7 +33,7 @@ export const users = createTable({
   },
 })
 
-export const orders = createTable({
+export const orders = table({
   name: 'orders',
   columns: {
     id: coerce.number(),
@@ -45,7 +45,7 @@ export const orders = createTable({
   },
 })
 
-export const orderItems = createTable({
+export const orderItems = table({
   name: 'order_items',
   primaryKey: ['order_id', 'book_id'],
   columns: {
@@ -63,7 +63,7 @@ export const orderItemsWithBook = itemsByOrder
   .orderBy('book_id', 'asc')
   .with({ book: bookForOrderItem })
 
-export const passwordResetTokens = createTable({
+export const passwordResetTokens = table({
   name: 'password_reset_tokens',
   primaryKey: ['token'],
   columns: {

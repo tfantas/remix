@@ -12,7 +12,7 @@ import type {
   UniqueConstraint,
 } from '../adapter.ts'
 import { rawSql } from '../sql.ts'
-import type { AlterTableBuilder, CreateTableBuilder, MigrationSchemaApi } from '../migrations.ts'
+import type { AlterTableBuilder, CreateTableBuilder, MigrationOperations } from '../migrations.ts'
 
 import { ColumnBuilder } from './column-builder.ts'
 import { normalizeIndexColumns, toTableRef } from './helpers.ts'
@@ -204,7 +204,7 @@ class AlterTableBuilderRuntime implements AlterTableBuilder {
 export function createSchemaApi(
   db: Database,
   emit: (operation: DataMigrationOperation) => Promise<void>,
-): MigrationSchemaApi {
+): MigrationOperations {
   return {
     async createTable(name, migrate, options) {
       let builder = new CreateTableBuilderRuntime()
