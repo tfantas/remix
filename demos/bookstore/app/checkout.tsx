@@ -131,9 +131,7 @@ export default {
           {
             user_id: user.id,
             total,
-            status: 'pending',
             shipping_address_json: JSON.stringify(shippingAddress),
-            created_at: Date.now(),
           },
           { returnRow: true },
         )

@@ -167,11 +167,9 @@ export default {
         let user = await db.create(
           users,
           {
-            email: normalizeEmail(email),
+            email,
             password,
             name,
-            role: 'customer',
-            created_at: Date.now(),
           },
           { returnRow: true },
         )
