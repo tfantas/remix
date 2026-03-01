@@ -1,6 +1,8 @@
 BREAKING CHANGE: Replace the existing adapter contract naming/shape with operation-based contracts
-(`AdapterStatement` -> `DataManipulationOperation`, `statement` -> `operation`) and split adapter
-execution into `execute` (DML operations) plus `migrate` (migration/DDL operations).
+(`AdapterStatement` -> `DataManipulationOperation`, `statement` -> `operation`).
 
-BREAKING CHANGE: Make adapter introspection methods required and transaction-aware:
+Add separate adapter execution methods for DML and migration/DDL operations:
+`execute` (DML operations) and `migrate` (migration/DDL operations).
+
+Add adapter introspection methods with optional transaction context:
 `hasTable(table, transaction?)` and `hasColumn(table, column, transaction?)`.
