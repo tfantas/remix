@@ -1,3 +1,6 @@
-BREAKING CHANGE: Update the mysql adapter to the split DML/DDL contract (`execute` for `DataManipulationOperation`, `migrate` for `DataMigrationOperation`), rename request payload field `statement` to `operation`, align compiler/runtime naming around operations, and keep adapter-level migration locking support.
+Add support for executing both data manipulation operations and data migration
+operations in the mysql adapter (`execute` for `DataManipulationOperation`,
+`migrate` for `DataMigrationOperation`), including adapter-level migration
+locking support.
 
 SQL compilation remains adapter-owned while sharing common helpers from `remix/data-table/sql-helpers`.
