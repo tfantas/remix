@@ -38,7 +38,9 @@ describe('createRangeRoot', () => {
 
       root.dispose()
 
-      host.dispatchEvent(new ErrorEvent('error', { bubbles: true, error: new Error('after dispose') }))
+      host.dispatchEvent(
+        new ErrorEvent('error', { bubbles: true, error: new Error('after dispose') }),
+      )
 
       expect(forwarded).toBeUndefined()
     })
